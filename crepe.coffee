@@ -9,6 +9,7 @@
 ###
 
 net = require('net')
+gp = require('./gnutella-packet.js')
 
 
 # Crepe Gnutella server. Handles all incoming requests
@@ -30,6 +31,7 @@ crepeServer.on 'connection', (socket) ->
   socket.on 'data', (data) ->
     if data == 'GNUTELLA CONNECT/0.4\n\n'
       socket.write 'GNUTELLA OK\n\n'
+
     else
       socket.end "Unknown command '#{data}'\n"
   
