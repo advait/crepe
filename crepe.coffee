@@ -15,13 +15,14 @@ server = new net.Server()
 
 server.on 'listening', ->
   address = this.address()
-  console.log 'server is now listening on ', address
+  console.log "server is now listening on #{address.address}:#{address.port}"
 
 
 # New connection handler
 server.on 'connection', (socket) ->
   socket.setEncoding 'utf8'
-  console.log 'new connection'
+  remote = "#{socket.remoteAddress}:#{socket.remotePort}"
+  console.log "new connection from #{remote}"
 
   # Incoming data handler
   socket.on 'data', (data) ->
@@ -30,6 +31,10 @@ server.on 'connection', (socket) ->
       socket.write 'pong\r\n'
     else
       socket.write "unknown command '#{data}'\r\n"
+  
+  # Connection close
+  socket.on 'end', ->
+    console.log "connection closed from #{remote}"
 
 
 # Bind and run!
