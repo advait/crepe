@@ -1,36 +1,37 @@
 ###
 # Crepe.coffee - Node.js Gnutella client
+# Authors:
+#   Advait Shinde (advait.shinde@gmail.com)
+#   Kevin Nguyen
+#   Mark Vismonte
+#
+# Use netcat to send some of the included *.netcat files
 ###
 
 net = require('net')
 
 
-###
-# Simple ping/pong server.
-# Telnet to localhost:1337 and send a 'ping'
-# The server should reply with a 'pong'
-###
-server = new net.Server()
+# Crepe Gnutella server. Handles all incoming requests
+crepeServer = new net.Server()
 
 
-server.on 'listening', ->
+crepeServer.on 'listening', ->
   address = this.address()
   console.log "server is now listening on #{address.address}:#{address.port}"
 
 
 # New connection handler
-server.on 'connection', (socket) ->
-  socket.setEncoding 'utf8'
+crepeServer.on 'connection', (socket) ->
+  socket.setEncoding 'ascii'
   remote = "#{socket.remoteAddress}:#{socket.remotePort}"
   console.log "new connection from #{remote}"
 
   # Incoming data handler
   socket.on 'data', (data) ->
-    data = data.trim()
-    if data == 'ping'
-      socket.write 'pong\r\n'
+    if data == 'GNUTELLA CONNECT/0.4\n\n'
+      socket.write 'GNUTELLA OK\n\n'
     else
-      socket.write "unknown command '#{data}'\r\n"
+      socket.end "Unknown command '#{data}'\n"
   
   # Connection close
   socket.on 'end', ->
@@ -38,4 +39,4 @@ server.on 'connection', (socket) ->
 
 
 # Bind and run!
-server.listen 1337
+crepeServer.listen 1337
