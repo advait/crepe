@@ -11,6 +11,9 @@
 net = require('net')
 gp = require('./gnutella-packet.js')
 
+p = new gp.PingPacket()
+console.log p
+console.log p.serialize()
 
 # Crepe Gnutella server. Handles all incoming requests
 crepeServer = new net.Server()

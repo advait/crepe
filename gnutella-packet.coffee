@@ -66,10 +66,11 @@ class root.GnutellaPacket
     output[18] = @hops # set hops
 
     # set Payload Length
-    # TODO(advait): Conver to big-endian 32-bit integer, set appropriately
+    payloadLengthBuffer = numberToByteBuffer payload.length, 4
+    payloadLengthBuffer.copy output, @HEADER_SIZE-4
 
     # set actual Payload
-    #payload.copy(output, @HEADER_SIZE)
+    payload.copy(output, @HEADER_SIZE)
 
     return output
 
@@ -99,3 +100,21 @@ class root.PingPacket extends root.GnutellaPacket
   serialize: ->
     super new Buffer(0)
 
+
+# Converts a JS number n into a Big Endian integer buffer
+# Args:
+#   n: the number to convert (floored to an Integer)
+#   bufferSize: the number of bytes in the output buffer
+# Returns:
+#   A Buffer of size bufferSize that is the big endian integer representation
+#   of n.
+numberToByteBuffer = (n, bufferSize) ->
+  n = Math.floor n
+  b = new Buffer bufferSize
+
+  for i in [0..b.length - 1]
+    divisor = Math.pow 256, (b.length - 1 - i)
+    value = Math.floor (n / divisor)
+    b[i] = (value % 256)
+    n = n % divisor
+  return b
