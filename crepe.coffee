@@ -11,7 +11,7 @@
 net = require('net')
 gp = require('./gnutella-packet.js')
 
-p = new gp.PingPacket()
+p = new gp.PongPacket()
 console.log p
 console.log p.serialize()
 

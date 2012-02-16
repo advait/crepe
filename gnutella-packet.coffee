@@ -66,7 +66,7 @@ class root.GnutellaPacket
     output[18] = @hops # set hops
 
     # set Payload Length
-    payloadLengthBuffer = numberToByteBuffer payload.length, 4
+    payloadLengthBuffer = numberToBuffer payload.length, 4
     payloadLengthBuffer.copy output, @HEADER_SIZE-4
 
     # set actual Payload
@@ -87,18 +87,68 @@ class root.PingPacket extends root.GnutellaPacket
   # Args:
   #   data: A Buffer (optional)
   constructor: (data) ->
-    if typeof data == Buffer
-      # Construct a
+    if Buffer.isBuffer(data)
+      # Construct a PingPacket object from a raw Buffer
       throw 'Createing a PingPacket from a Buffer is not implemented yet'
 
+    # Generic packet attributes
+    # TODO(advait): remove defaults
     data = data ? new Object()
     @id = data.id ? "7777777777777777"
     @type = PacketType.PING
     @ttl = data.ttl ? 0
     @hops = data.hops ? 0
 
+    # Note: Ping Packets don't have any ping-specific attributes
+
   serialize: ->
     super new Buffer(0)
+
+
+# A Gnutella Pong Packet
+class root.PongPacket extends root.GnutellaPacket
+  # Args:
+  #   data: A BUffer (optional)
+  constructor: (data) ->
+    if Buffer.isBuffer(data)
+      # Construct a PongPacket object from a raw Buffer
+      throw 'Createing a PongPacket from a Buffer is not implemented yet'
+
+    # Generic packet attributes
+    # TODO(advait): remove defaults
+    data = data ? new Object()
+    @id = data.id ? "7777777777777777"
+    @type = PacketType.PONG
+    @ttl = data.ttl ? 0
+    @hops = data.hops ? 0
+
+    # Pong-specific packet attributes
+    # TODO(advait): remove defaults
+    @port = data.port ? 1337
+    @ip = data.ip ? '255.255.255.255'
+    @filesShared = data.filesShared ? 0
+    @kbShared = data.kbShared ? 0
+
+  serialize: ->
+    output = new Buffer 14
+
+    # set port
+    portBuffer = numberToBuffer @port, 2
+    portBuffer.copy output, 0
+
+    # set ip
+    ipBuffer = ipToLittleEndian @ip
+    ipBuffer.copy output, 2
+
+    # set filesShared
+    filesSharedBuffer = numberToBuffer @filesShared, 4
+    filesSharedBuffer.copy output, 6
+
+    # set kbShared
+    kbSharedBuffer = numberToBuffer @kbShared, 4
+    kbSharedBuffer.copy output, 10
+
+    super output
 
 
 # Converts a JS number n into a Big Endian integer buffer
@@ -108,7 +158,7 @@ class root.PingPacket extends root.GnutellaPacket
 # Returns:
 #   A Buffer of size bufferSize that is the big endian integer representation
 #   of n.
-numberToByteBuffer = (n, bufferSize) ->
+numberToBuffer = (n, bufferSize) ->
   n = Math.floor n
   b = new Buffer bufferSize
 
@@ -118,3 +168,23 @@ numberToByteBuffer = (n, bufferSize) ->
     b[i] = (value % 256)
     n = n % divisor
   return b
+
+
+# Converts an ip address (string) into a Big Endian byte buffer
+ipToBigEndian = (ip) ->
+  ip = ip.split('.')
+  assert.ok ip.length == 4
+  output = new Buffer 4
+  for i in [0..3]
+    output[i] = parseInt ip[i]
+  return output
+
+
+# Converts an ip address (string) into a Little Endian byte buffer
+ipToLittleEndian = (ip) ->
+  ip = ip.split('.')
+  assert.ok ip.length == 4
+  output = new Buffer 4
+  for i in [0..3]
+    output[i] = parseInt ip[3-i]
+  return output
