@@ -42,6 +42,12 @@ crepeServer.on 'connection', (socket) ->
   socket.on 'end', ->
     console.log "connection closed from #{remote}"
 
+  # Socket error
+  socket.on 'error', (error) ->
+    console.log "SOCKET ERROR: #{error}"
+    if error.code == 'EADDRINUSE'
+      console.log "retrying with different port"
+
 
 # Bind and run!
-crepeServer.listen 1337
+crepeServer.listen 0
