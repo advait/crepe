@@ -2,7 +2,7 @@
 # Crepe.coffee - Node.js Gnutella client
 # Authors:
 #   Advait Shinde (advait.shinde@gmail.com)
-#   Kevin Nguyen
+#   Kevin Nguyen (kevioke1337@gmail.com)
 #   Mark Vismonte
 #
 # Use netcat to send some of the included *.netcat files
@@ -13,10 +13,6 @@ bootstrap_host = process.argv[3]
 
 net = require('net')
 gp = require('./gnutella-packet.js')
-
-p = new gp.PingPacket()
-console.log p
-console.log p.serialize()
 
 # Crepe Gnutella server. Handles all incoming requests
 crepeServer = new net.Server()
@@ -29,17 +25,53 @@ crepeServer.on 'listening', ->
 
 # New connection handler
 crepeServer.on 'connection', (socket) ->
-  socket.setEncoding 'ascii'
   remote = "#{socket.remoteAddress}:#{socket.remotePort}"
   console.log "new connection from #{remote}"
 
   # Incoming data handler
   socket.on 'data', (data) ->
-    if data == 'GNUTELLA CONNECT/0.4\n\n'
+    if data.toString() == 'GNUTELLA CONNECT/0.4\n\n'
+      # TODO: check if this node can join
       socket.write 'GNUTELLA OK\n\n'
 
     else
-      socket.end "Unknown command '#{data}'\n"
+      switch data[16]
+
+        # handle ping
+        when 0x00
+          # set up pong descriptor
+          pong_data = new Object()
+          pong_data.port = socket.address().port
+          pong_data.address = socket.address().address
+          pong_data.numFiles = 1337 #TODO: retrieve actual number of files shared
+          pong_data.numKbShared = 1234
+
+          # send pong
+          console.log "sending pong to #{@remoteAddress}:#{@remotePort}"
+          pong = new gp.PongPacket(pong_data)
+          socket.write(pong.serialize())
+
+          #TODO: forward ping to other nodes
+
+        # handle pong
+        when 0x01
+          break
+
+        # handle push
+        when 0x40
+          break
+
+        # handle query
+        when 0x80
+          break
+
+        # handle query hit
+        when 0x81
+          break
+
+        # default
+        else
+          socket.write "Unknown command '#{data}'\n"
   
   # Connection close
   socket.on 'end', ->
@@ -55,10 +87,14 @@ crepeServer.on 'connection', (socket) ->
 # Bind and run!
 crepeServer.listen 0
 
-# Connect to bootstrap node and try to join network
+# crepeConnect socket handles joining the network
 crepeConnect = new net.Socket()
+
 crepeConnect.on 'connect', ->
-  this.write('GNUTELLA CONNECT/0.4\n\n')
+  # Send connect request
+  console.log "Sending connect request to #{this.remoteAddress}:#{this.remotePort}"
+  conPacket = new gp.ConnectPacket()
+  this.write(conPacket.serialize())
 
 # Error handler
 crepeConnect.on 'error', (error) ->
@@ -66,11 +102,26 @@ crepeConnect.on 'error', (error) ->
 
 # Incoming data
 crepeConnect.on 'data', (data) ->
-  console.log data.toString('ascii')
-  if data.toString('ascii') == 'GNUTELLA OK\n\n'
-    console.log "Successfully connected to #{this.remotePort}"
 
-# Try to contact bootstrap node
+  # Handle Connect OK confirmation
+  if data.toString() == 'GNUTELLA OK\n\n'
+    console.log "Received ok from #{this.remoteAddress}:#{this.remotePort}"
+    console.log "Sending ping message to #{this.remoteAddress}:#{this.remotePort}"
+
+    # Send a ping to the bootstrap node
+    ping = new gp.PingPacket()
+    this.write(ping.serialize())
+
+  # Handle incoming pong
+  else if data[16] == 0x01
+    pong = new gp.PongPacket(data)
+    console.log "Received pong from #{pong.address}:#{pong.port}"
+    console.log "#{pong.address}:#{pong.port} has #{pong.numFiles} files, #{pong.numKbShared} Kb"
+
+  else
+    console.log "UNKNOWN data: #{data.toString()}"
+
+# connect to the bootstrap node
 if bootstrap_port != undefined
   if bootstrap_host != undefined
     crepeConnect.connect(bootstrap_port, bootstrap_host)

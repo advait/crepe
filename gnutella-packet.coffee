@@ -94,12 +94,66 @@ class root.PingPacket extends root.GnutellaPacket
     data = data ? new Object()
     @id = data.id ? "7777777777777777"
     @type = PacketType.PING
-    @ttl = data.ttl ? 0
+    @ttl = data.ttl ? 7
     @hops = data.hops ? 0
 
   serialize: ->
     super new Buffer(0)
 
+# A Gnutella Pong Packet
+class root.PongPacket extends root.GnutellaPacket
+  PAYLOAD_SIZE : 14
+
+  # Args:
+  #   data: A Buffer (optional)
+  constructor: (data) ->
+    if data instanceof Buffer
+      # extract the pong information from the payload (i.e. the pong descriptor)
+      @port = byteBufferToNumber(data.slice(@HEADER_SIZE, @HEADER_SIZE + 2))
+      @address = byteBufferToAddress(data.slice(@HEADER_SIZE + 2, @HEADER_SIZE + 6))
+      @numFiles = byteBufferToNumber(data.slice(@HEADER_SIZE + 6, @HEADER_SIZE + 10))
+      @numKbShared = byteBufferToNumber(data.slice(@HEADER_SIZE + 10, @HEADER_SIZE + 14))
+
+    else
+      data = data ? new Object()
+      @id = data.id ? "8888888888888888"
+      @type = PacketType.PONG
+      @ttl = data.ttl ? 7
+      @hops = data.hops ? 0
+      @port = data.port ? 0
+      @address = data.address ? "137.137.137.137"
+      @numFiles = data.numFiles ? 0
+      @numKbShared = data.numKbShared ? 0
+
+  serialize: ->
+    payload = new Buffer(@PAYLOAD_SIZE)
+
+    port = numberToByteBuffer(@port, 2)
+    port.copy(payload, 0)
+
+    address = addressToByteBuffer(@address, 4)
+    address.copy(payload, 2)
+
+    numFiles = numberToByteBuffer(@numFiles, 4)
+    numFiles.copy(payload, 6)
+
+    numKbShared = numberToByteBuffer(@numKbShared, 4)
+    numKbShared.copy(payload, 10)
+
+    super new Buffer(payload)
+
+# A Gnutella Connect Packet
+class root.ConnectPacket extends root.GnutellaPacket
+  # Args:
+  #   data: A Buffer (optional)
+  constructor: ->
+    data = data ? new Object()
+    @type = PacketType.CONNECT
+    @ttl = data.ttl ? 1
+    @hops = data.hops ? 0
+
+  serialize: ->
+    super new Buffer(0)
 
 # Converts a JS number n into a Big Endian integer buffer
 # Args:
@@ -117,4 +171,35 @@ numberToByteBuffer = (n, bufferSize) ->
     value = Math.floor (n / divisor)
     b[i] = (value % 256)
     n = n % divisor
+  return b
+
+# Converts a Big Endian buffer into a JS number
+byteBufferToNumber = (buffer) ->
+  multiplier = 1
+  result = 0
+
+  for i in [(buffer.length - 1)..0]
+    result = result + buffer[i] * multiplier
+    multiplier = multiplier * 256
+
+  return result
+
+# Convert a Little Endian buffer into an IP Address
+byteBufferToAddress = (buffer) ->
+  result = buffer[0]
+
+  for i in [1..buffer.length - 1]
+    result = buffer[i] + "." + result
+
+  return result
+
+# Convert an IP Address into a Little Endian buffer
+addressToByteBuffer = (address, bufferSize) ->
+  n = Math.floor address.replace(".","")
+  b = new Buffer bufferSize
+
+  for i in [0..b.length - 1]
+    b[i] = (n % 256)
+    n = Math.floor (n / 256)
+
   return b
