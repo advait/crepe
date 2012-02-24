@@ -11,10 +11,6 @@
 net = require('net')
 gp = require('./gnutella-packet.js')
 
-p = new gp.PongPacket()
-console.log p
-console.log p.serialize()
-
 # Crepe Gnutella server. Handles all incoming requests
 crepeServer = new net.Server()
 
@@ -32,6 +28,7 @@ crepeServer.on 'connection', (socket) ->
 
   # Incoming data handler
   socket.on 'data', (data) ->
+    # TODO(advait): use gp.deserialize() instead of manual parsing!
     if data == 'GNUTELLA CONNECT/0.4\n\n'
       socket.write 'GNUTELLA OK\n\n'
 

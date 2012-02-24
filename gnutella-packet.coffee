@@ -8,7 +8,45 @@ assert = require('assert')
 root = exports ? this  # http://stackoverflow.com/questions/4214731/coffeescript-global-variables
 
 
-# The types of packets we have!
+##############################################################################
+# Deserialize
+##############################################################################
+
+
+# deserialize a raw data buffer into a GnutellaPacket subclass
+# This method is pretty vital!
+# Args:
+#   buffer: The incoming buffer to deserialize.
+# Returns:
+#   A GnutellaPacket subclass corresponding to the type of packet we got.
+root.deserialize = (buffer) ->
+  s = buffer.toString()
+
+  if s == 'GNUTELLA CONNECT/0.4\n\n'
+    return new root.ConnectPacket()
+
+  if s == 'GNUTELLA OK\n\n'
+    return new root.ConnectOKPacket()
+
+  assert.ok buffer.length >= root.GnutellaPacket.HEADER_SIZE
+  payloadDescriptor = buffer[16]  # see spec!
+
+  output = null
+  switch payloadDescriptor
+    when 0x00 then output = new root.PingPacket()
+    when 0x01 then output = new root.PongPacket()
+    when 0x40 then output = new root.PushPacket()
+    when 0x80 then output = new root.QueryPacket()
+    when 0x81 then output = new root.QueryHitPacket()
+    else throw 'Invalid/corrupt packet'
+    
+
+##############################################################################
+# GnutellaPacket implementations
+##############################################################################
+
+
+# Enum: The types of packets we have!
 PacketType =
   CONNECT: 1
   CONNECTOK: 2
@@ -23,11 +61,6 @@ PacketType =
 # Gnutella Packet base class
 class root.GnutellaPacket
   HEADER_SIZE: 23  # The size of the packet header
-
-  # Args:
-  #   data: A Buffer
-  constructor: (data) ->
-    throw 'Do not instantiate the base class!'
 
   # Serializes this packet into a sendable buffer
   # Args:
@@ -80,6 +113,22 @@ class root.GnutellaPacket
   type: null  # PacketType representing packet type
   ttl: null  # Integer TTL
   hops: null  # Integer Hops
+
+
+# A Gnutella Connect packet
+class root.ConnectPacket extends root.GnutellaPacket
+  constructor: (data) ->
+    @type = PacketType.CONNECT
+
+  serialize: -> new Buffer 'GNUTELLA CONNECT/0.4\n\n', 'ascii'
+    
+
+# A Gnutella Connect OK packet
+class root.ConnectOKPacket extends root.GnutellaPacket
+  constructor: (data) ->
+    @type = PacketType.CONNECTOK
+
+  serialize: -> new Buffer 'GNUTELLA OK\n\n', 'ascii'
 
 
 # A Gnutella Ping Packet
@@ -151,23 +200,45 @@ class root.PongPacket extends root.GnutellaPacket
     super output
 
 
+##############################################################################
+# Utility methods
+##############################################################################
+
+
 # Converts a JS number n into a Big Endian integer buffer
 # Args:
 #   n: the number to convert (floored to an Integer)
-#   bufferSize: the number of bytes in the output buffer
+#   bufferSize: the number of bytes in the output buffer (default = 4)
 # Returns:
 #   A Buffer of size bufferSize that is the big endian integer representation
 #   of n.
 numberToBuffer = (n, bufferSize) ->
   n = Math.floor n
+  bufferSize ?= 4
   b = new Buffer bufferSize
 
-  for i in [0..b.length - 1]
+  for i in [0..b.length-1]
     divisor = Math.pow 256, (b.length - 1 - i)
     value = Math.floor (n / divisor)
     b[i] = (value % 256)
     n = n % divisor
   return b
+root.numberToBuffer = numberToBuffer
+
+
+# Parses a Buffer as a Big Endian Int and returns the correspodning JS Number
+# Args:
+#   buffer: the Buffer object
+# Returns:
+#   A JS Number
+bufferToNumber = (buffer) ->
+  assert.ok Buffer.isBuffer buffer
+  accum = 0
+  for i in [0..buffer.length-1]
+    accum *= 256
+    accum += buffer[i]
+  return accum
+root.bufferToNumber = bufferToNumber
 
 
 # Converts an ip address (string) into a Big Endian byte buffer
@@ -178,6 +249,7 @@ ipToBigEndian = (ip) ->
   for i in [0..3]
     output[i] = parseInt ip[i]
   return output
+root.ipToBigEndian = ipToBigEndian
 
 
 # Converts an ip address (string) into a Little Endian byte buffer
@@ -188,3 +260,5 @@ ipToLittleEndian = (ip) ->
   for i in [0..3]
     output[i] = parseInt ip[3-i]
   return output
+root.ipToLittleEndian = ipToLittleEndian
+
