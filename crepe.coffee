@@ -19,8 +19,7 @@ FileServer = require('./file-server').FileServer
 bootstrap_port = process.argv[2]
 bootstrap_host = process.argv[3]
 nodes = new Object()
-shared_folder = "shared"
-shared_folder = "/home/mark/cs114/crepe"
+shared_folder = process.cwd()
 
 
 # Crepe Gnutella server. Handles all incoming requests
