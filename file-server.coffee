@@ -47,5 +47,5 @@ class exports.FileServer
 
   listen: (port) ->
     @server.listen port
-    console.log "Static Files hosting on localhost:7777\nCTRL+C to exit"
+    console.log "Static Files hosting on localhost:#{port}"
 

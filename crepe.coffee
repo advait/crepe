@@ -32,7 +32,7 @@ fileServer.listen(7777)
 crepeServer.on 'listening', ->
   address = this.address()
   console.log "server is now listening on #{address.address}:#{address.port}"
-
+  console.log "CTRL+C to exit"
 
 # New connection handler
 crepeServer.on 'connection', (socket) ->
@@ -138,3 +138,4 @@ if bootstrap_port != undefined
     crepeConnect.connect(bootstrap_port, bootstrap_host)
   else
     crepeConnect.connect(bootstrap_port)
+
