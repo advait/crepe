@@ -10,8 +10,12 @@
 
 bootstrap_port = process.argv[2]
 bootstrap_host = process.argv[3]
+nodes = new Object()
+shared_folder = "shared"
 
 net = require('net')
+fs = require('fs')
+util = require('util')
 gp = require('./gnutella-packet.js')
 
 # Crepe Gnutella server. Handles all incoming requests
@@ -39,12 +43,23 @@ crepeServer.on 'connection', (socket) ->
 
         # handle ping
         when 0x00
+          # store node in array of neighbor nodes
+          nodes[this.remoteAddress + ":" + this.remotePort] = true
+
+          # DEBUG output
+          for address of nodes
+            console.log "Neighbor #{address}"
+
           # set up pong descriptor
           pong_data = new Object()
           pong_data.port = socket.address().port
           pong_data.address = socket.address().address
-          pong_data.numFiles = 1337 #TODO: retrieve actual number of files shared
-          pong_data.numKbShared = 1234
+
+          # get shared folder info
+          #TODO: correct this part
+          #stat = fs.statSync(shared_folder)
+          #pong_data.numFiles = stat.nlink
+          #pong_data.numKbShared = stat.size
 
           # send pong
           console.log "sending pong to #{@remoteAddress}:#{@remotePort}"
