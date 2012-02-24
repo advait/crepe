@@ -3,7 +3,7 @@
 # Authors:
 #   Advait Shinde (advait.shinde@gmail.com)
 #   Kevin Nguyen (kevioke1337@gmail.com)
-#   Mark Vismonte
+#   Mark Vismonte (mark.vismonte@gmail.com)
 #
 # Use netcat to send some of the included *.netcat files
 ###
@@ -13,17 +13,22 @@ net = require('net')
 fs = require('fs')
 util = require('util')
 gp = require('./gnutella-packet.js')
+FileServer = require('./file-server').FileServer
 
 
 bootstrap_port = process.argv[2]
 bootstrap_host = process.argv[3]
 nodes = new Object()
 shared_folder = "shared"
+shared_folder = "/home/mark/cs114/crepe"
 
 
 # Crepe Gnutella server. Handles all incoming requests
 crepeServer = new net.Server()
+fileServer = new FileServer(shared_folder)
 
+# Run file server
+fileServer.listen(7777)
 
 crepeServer.on 'listening', ->
   address = this.address()
