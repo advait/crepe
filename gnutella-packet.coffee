@@ -142,13 +142,13 @@ class root.ConnectOKPacket extends root.GnutellaPacket
 # A Gnutella Ping Packet
 class root.PingPacket extends root.GnutellaPacket
   # Args:
-  #   payload: (optional) A Gnutella payload buffer (without the header)
+  #   data: (optional) A Gnutella payload buffer (without the header)
   #       luckily, PingPacket don't have payloads so this should be an
   #       empty buffer
   constructor: (data) ->
+    @type = PacketType.PING
     if Buffer.isBuffer(data)
       assert.ok data.length == 0
-    @type = PacketType.PING
     # Note: Ping Packets don't have any ping-specific attributes
 
   serialize: ->
@@ -160,12 +160,12 @@ class root.PongPacket extends root.GnutellaPacket
   PAYLOAD_SIZE: 14
 
   # Args:
-  #   data: A Buffer (optional)
+  #   data: (optional) A Gnutella payload buffer (without the header)
   constructor: (data) ->
+    @type = PacketType.PONG
     if data instanceof Buffer
       # extract the pong information from the payload (i.e. the pong descriptor)
       assert.ok data.length == @PAYLOAD_SIZE
-      @type = PacketType.PONG
       @port = bufferToNumber(data.slice(0, 2))
       @address = littleEndianToIp(data.slice(2, 6))
       @numFiles = bufferToNumber(data.slice(6, 10))
@@ -173,7 +173,6 @@ class root.PongPacket extends root.GnutellaPacket
     else  # Fill with default attrs
       # TODO(advait): remove default attrs
       @id ?= "8888888888888888"
-      @type = PacketType.PONG
       @ttl ?= 7
       @hops ?= 0
       @port ?= 0
@@ -183,19 +182,10 @@ class root.PongPacket extends root.GnutellaPacket
 
   serialize: ->
     payload = new Buffer(@PAYLOAD_SIZE)
-
-    port = numberToByteBuffer(@port, 2)
-    port.copy(payload, 0)
-
-    address = ipToLittleEndian(@address, 4)
-    address.copy(payload, 2)
-
-    numFiles = numberToByteBuffer(@numFiles, 4)
-    numFiles.copy(payload, 6)
-
-    numKbShared = numberToByteBuffer(@numKbShared, 4)
-    numKbShared.copy(payload, 10)
-
+    payload.writeUInt16BE(@port, 0)
+    ipToLittleEndian(@address, 4).copy(payload, 2)
+    payload.writeUInt32BE(@numFiles, 6)
+    payload.writeUInt32BE(@numKbShared, 10)
     super payload
 
 
@@ -204,17 +194,16 @@ class root.QueryPacket extends root.GnutellaPacket
   MIN_PAYLOAD_SIZE: 2
 
   # Args:
-  #   data: A Buffer (optional)
+  #   data: (optional) A Gnutella payload buffer (without the header)
   constructor: (data) ->
+    @type = PacketType.QUERY
     if data instanceof Buffer
       # extract the pong information from the payload (i.e. the pong descriptor)
       assert.ok data.length >= @MIN_PAYLOAD_SIZE
-      @type = PacketType.QUERY
       @searchCriteria = data.toString('utf8', 2)
     else  # Fill with default attrs
       # TODO(advait): remove default attrs
       @id ?= "8888888888888888"
-      @type = PacketType.QUERY
       @ttl ?= 7
       @hops ?= 0
       @searchCriteria ?= 'hello world'
@@ -225,6 +214,44 @@ class root.QueryPacket extends root.GnutellaPacket
     payload[@searchCriteria] = 0  # Null terminator
     super payload
 
+
+# A Gnutella Query Hit Packet
+class root.QueryHitPacket extends root.GnutellaPacket
+  MIN_PAYLOAD_SIZE: 11
+  # TODO(advait): Implement this
+
+
+# A Gnutella Push Packet
+class root.PushPacket extends root.GnutellaPacket
+  PAYLOAD_SIZE: 26
+
+  # Args:
+  #   data: (optional) A Gnutella payload buffer (without the header)
+  constructor: (data) ->
+    @type = PacketType.PUSH
+    if data instanceof Buffer
+      assert.ok data.length == @PAYLOAD_SIZE
+      @serventIdentifier = data.toString('utf8', 0, 16)
+      @fileIndex = bufferToNumber(data.slice(16, 20))
+      @address = bigEndianToIp(data.slice(20, 24))
+      @port = bufferToNumber(data.slice(24, 26))
+    else  # Fill with default attrs
+      # TODO(advait): remove default attrs
+      @id ?= "8888888888888888"
+      @ttl ?= 7
+      @hops ?= 0
+      @serventIdentifier ?= '0123456789abcdef'
+      @fileIndex ?= 1337
+      @address ?= '137.137.137.137'
+      @port ?= 0
+
+  serialize: ->
+    payload = new Buffer(PAYLOAD_SIZE)
+    payload.write(@serventIdentifier, 0, 16)
+    payload.writeUInt32BE(@fileIndex, 16)
+    ipToBigEndian(@address).copy(payload, 20)
+    payload.writeUInt16BE(@port, 24)
+    super payload
 
 ##############################################################################
 # Utility methods
@@ -295,10 +322,10 @@ root.ipToLittleEndian = ipToLittleEndian
 # Converts a Big Endian byte buffer to an ip address (string)
 bigEndianToIp = (buffer) ->
   assert.ok buffer.length == 4
-  '#{buffer[0]}.#{buffer[1]}.#{buffer[2]}.#{buffer[3]}'
+  "#{buffer[0]}.#{buffer[1]}.#{buffer[2]}.#{buffer[3]}"
 
 # Converts a Little Endian byte buffer to an ip address (string)
 littleEndianToIp = (buffer) ->
   assert.ok buffer.length == 4
-  '#{buffer[3]}.#{buffer[2]}.#{buffer[1]}.#{buffer[0]}'
+  "#{buffer[3]}.#{buffer[2]}.#{buffer[1]}.#{buffer[0]}"
 
