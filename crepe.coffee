@@ -37,60 +37,48 @@ crepeServer.on 'connection', (socket) ->
 
   # Incoming data handler
   socket.on 'data', (data) ->
-    # TODO(advait): use gp.deserialize() instead of manual parsing!
-    if data.toString() == 'GNUTELLA CONNECT/0.4\n\n'
-      # TODO: check if this node can join
-      socket.write 'GNUTELLA OK\n\n'
+    packet = gp.deserialize(data)
+    switch packet.type
+      # handle ping
+      when gp.PacketType.PING
+        # store node in array of neighbor nodes
+        nodes[this.remoteAddress + ":" + this.remotePort] = true
 
-    else
-      switch data[16]
+        # DEBUG output
+        for address of nodes
+          console.log "Neighbor #{address}"
 
-        # handle ping
-        when 0x00
-          # store node in array of neighbor nodes
-          nodes[this.remoteAddress + ":" + this.remotePort] = true
+        # send pong
+        console.log "sending pong to #{@remoteAddress}:#{@remotePort}"
+        serverAddress = crepeServer.address()
+        pong = new gp.PongPacket()
+        pong.address = serverAddress.address
+        pong.port = serverAddress.port
+        pong.numFiles = 1337  # TODO(advait): Fix this
+        pong.numKbShared = 1337  # TODO(advait): Fix
+        socket.write(pong.serialize())
 
-          # DEBUG output
-          for address of nodes
-            console.log "Neighbor #{address}"
+        #TODO: forward ping to other nodes
 
-          # set up pong descriptor
-          pong_data = new Object()
-          pong_data.port = socket.address().port
-          pong_data.address = socket.address().address
+      # handle pong
+      when gp.PacketType.PONG
+        break
 
-          # get shared folder info
-          #TODO: correct this part
-          #stat = fs.statSync(shared_folder)
-          #pong_data.numFiles = stat.nlink
-          #pong_data.numKbShared = stat.size
+      # handle push
+      when gp.PacketType.PONG
+        break
 
-          # send pong
-          console.log "sending pong to #{@remoteAddress}:#{@remotePort}"
-          pong = new gp.PongPacket(pong_data)
-          socket.write(pong.serialize())
+      # handle query
+      when gp.PacketType.PONG
+        break
 
-          #TODO: forward ping to other nodes
+      # handle query hit
+      when gp.PacketType.PONG
+        break
 
-        # handle pong
-        when 0x01
-          break
-
-        # handle push
-        when 0x40
-          break
-
-        # handle query
-        when 0x80
-          break
-
-        # handle query hit
-        when 0x81
-          break
-
-        # default
-        else
-          socket.write "Unknown command '#{data}'\n"
+      # default
+      else
+        socket.write "Unknown command '#{data}'\n"
   
   # Connection close
   socket.on 'end', ->
