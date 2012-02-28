@@ -172,7 +172,7 @@ class root.PongPacket extends root.GnutellaPacket
       @numKbShared = bufferToNumber(data.slice(10, 14))
     else  # Fill with default attrs
       # TODO(advait): remove default attrs
-      @id = "8888888888888888"
+      @id ?= "8888888888888888"
       @type = PacketType.PONG
       @ttl ?= 7
       @hops ?= 0
@@ -196,12 +196,43 @@ class root.PongPacket extends root.GnutellaPacket
     numKbShared = numberToByteBuffer(@numKbShared, 4)
     numKbShared.copy(payload, 10)
 
-    super new Buffer(payload)
+    super payload
+
+
+# A Gnutella Query Packet
+class root.QueryPacket extends root.GnutellaPacket
+  MIN_PAYLOAD_SIZE: 2
+
+  # Args:
+  #   data: A Buffer (optional)
+  constructor: (data) ->
+    if data instanceof Buffer
+      # extract the pong information from the payload (i.e. the pong descriptor)
+      assert.ok data.length >= @MIN_PAYLOAD_SIZE
+      @type = PacketType.QUERY
+      @searchCriteria = data.toString('utf8', 2)
+    else  # Fill with default attrs
+      # TODO(advait): remove default attrs
+      @id ?= "8888888888888888"
+      @type = PacketType.QUERY
+      @ttl ?= 7
+      @hops ?= 0
+      @searchCriteria ?= 'hello world'
+
+  serialize: ->
+    payload = new Buffer(@searchCriteria.length + 1)
+    payload.write(@searchCriteria)
+    payload[@searchCriteria] = 0  # Null terminator
+    super payload
 
 
 ##############################################################################
 # Utility methods
 ##############################################################################
+
+
+# TODO(advait): Deprecate all these methods in favor of the inbuilt ones:
+# http://nodejs.org/docs/latest/api/buffers.html#buffer.readInt32LE
 
 
 # Converts a JS number n into a Big Endian integer buffer
