@@ -8,15 +8,18 @@
 # Use netcat to send some of the included *.netcat files
 ###
 
+# Imports
+net = require('net')
+fs = require('fs')
+util = require('util')
+gp = require('./gnutella-packet.js')
+
+
 bootstrap_port = process.argv[2]
 bootstrap_host = process.argv[3]
 nodes = new Object()
 shared_folder = "shared"
 
-net = require('net')
-fs = require('fs')
-util = require('util')
-gp = require('./gnutella-packet.js')
 
 # Crepe Gnutella server. Handles all incoming requests
 crepeServer = new net.Server()

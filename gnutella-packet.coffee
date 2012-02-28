@@ -20,6 +20,7 @@ root = exports ? this  # http://stackoverflow.com/questions/4214731/coffeescript
 # Returns:
 #   A GnutellaPacket subclass corresponding to the type of packet we got.
 root.deserialize = (buffer) ->
+  assert.ok buffer.isBuffer buffer
   s = buffer.toString()
 
   if s == 'GNUTELLA CONNECT/0.4\n\n'
@@ -32,13 +33,20 @@ root.deserialize = (buffer) ->
   payloadDescriptor = buffer[16]  # see spec!
 
   output = null
+  payloadBuffer = buffer.slice(root.GnutellaPacket.HEADER_SIZE)
   switch payloadDescriptor
-    when 0x00 then output = new root.PingPacket()
-    when 0x01 then output = new root.PongPacket()
-    when 0x40 then output = new root.PushPacket()
-    when 0x80 then output = new root.QueryPacket()
-    when 0x81 then output = new root.QueryHitPacket()
+    when 0x00 then output = new root.PingPacket(payloadBuffer)
+    when 0x01 then output = new root.PongPacket(payloadBuffer)
+    when 0x40 then output = new root.PushPacket(payloadBuffer)
+    when 0x80 then output = new root.QueryPacket(payloadBuffer)
+    when 0x81 then output = new root.QueryHitPacket(payloadBuffer)
     else throw 'Invalid/corrupt packet'
+
+  # Parse packet header
+  output.id = buffer.toString('utf8', 0, 16)
+  output.ttl = buffer[17]
+  output.hops = buffer[18]
+
     
 
 ##############################################################################
@@ -62,11 +70,11 @@ PacketType =
 class root.GnutellaPacket
   HEADER_SIZE: 23  # The size of the packet header
 
-  # Serializes this packet into a sendable buffer
+  # Serializes this packet object into a sendable buffer
   # Args:
   #   payload: a buffer containing a Gnutalla Payload
   # Returns:
-  #   A Buffer of sendable data
+  #   A buffer of sendable data
   serialize: (payload) ->
     # The simple packet types
     if @type == PacketType.CONNECT
@@ -134,20 +142,13 @@ class root.ConnectOKPacket extends root.GnutellaPacket
 # A Gnutella Ping Packet
 class root.PingPacket extends root.GnutellaPacket
   # Args:
-  #   data: A Buffer (optional)
+  #   payload: (optional) A Gnutella payload buffer (without the header)
+  #       luckily, PingPacket don't have payloads so this should be an
+  #       empty buffer
   constructor: (data) ->
     if Buffer.isBuffer(data)
-      # Construct a PingPacket object from a raw Buffer
-      throw 'Createing a PingPacket from a Buffer is not implemented yet'
-
-    # Generic packet attributes
-    # TODO(advait): remove defaults
-    data = data ? new Object()
-    @id = data.id ? "7777777777777777"
+      assert.ok data.length == 0
     @type = PacketType.PING
-    @ttl = data.ttl ? 7
-    @hops = data.hops ? 0
-
     # Note: Ping Packets don't have any ping-specific attributes
 
   serialize: ->
@@ -156,28 +157,29 @@ class root.PingPacket extends root.GnutellaPacket
 
 # A Gnutella Pong Packet
 class root.PongPacket extends root.GnutellaPacket
-  PAYLOAD_SIZE : 14
+  PAYLOAD_SIZE: 14
 
   # Args:
   #   data: A Buffer (optional)
   constructor: (data) ->
     if data instanceof Buffer
       # extract the pong information from the payload (i.e. the pong descriptor)
-      @port = byteBufferToNumber(data.slice(@HEADER_SIZE, @HEADER_SIZE + 2))
-      @address = byteBufferToAddress(data.slice(@HEADER_SIZE + 2, @HEADER_SIZE + 6))
-      @numFiles = byteBufferToNumber(data.slice(@HEADER_SIZE + 6, @HEADER_SIZE + 10))
-      @numKbShared = byteBufferToNumber(data.slice(@HEADER_SIZE + 10, @HEADER_SIZE + 14))
-
-    else
-      data = data ? new Object()
-      @id = data.id ? "8888888888888888"
+      assert.ok data.length == @PAYLOAD_SIZE
       @type = PacketType.PONG
-      @ttl = data.ttl ? 7
-      @hops = data.hops ? 0
-      @port = data.port ? 0
-      @address = data.address ? "137.137.137.137"
-      @numFiles = data.numFiles ? 0
-      @numKbShared = data.numKbShared ? 0
+      @port = bufferToNumber(data.slice(0, 2))
+      @address = littleEndianToIp(data.slice(2, 6))
+      @numFiles = bufferToNumber(data.slice(6, 10))
+      @numKbShared = bufferToNumber(data.slice(10, 14))
+    else  # Fill with default attrs
+      # TODO(advait): remove default attrs
+      @id = "8888888888888888"
+      @type = PacketType.PONG
+      @ttl ?= 7
+      @hops ?= 0
+      @port ?= 0
+      @address ?= "137.137.137.137"
+      @numFiles ?= 0
+      @numKbShared ?= 0
 
   serialize: ->
     payload = new Buffer(@PAYLOAD_SIZE)
@@ -185,7 +187,7 @@ class root.PongPacket extends root.GnutellaPacket
     port = numberToByteBuffer(@port, 2)
     port.copy(payload, 0)
 
-    address = addressToByteBuffer(@address, 4)
+    address = ipToLittleEndian(@address, 4)
     address.copy(payload, 2)
 
     numFiles = numberToByteBuffer(@numFiles, 4)
@@ -318,4 +320,14 @@ ipToLittleEndian = (ip) ->
     output[i] = parseInt ip[3-i]
   return output
 root.ipToLittleEndian = ipToLittleEndian
+
+# Converts a Big Endian byte buffer to an ip address (string)
+bigEndianToIp = (buffer) ->
+  assert.ok buffer.length == 4
+  '#{buffer[0]}.#{buffer[1]}.#{buffer[2]}.#{buffer[3]}'
+
+# Converts a Little Endian byte buffer to an ip address (string)
+littleEndianToIp = (buffer) ->
+  assert.ok buffer.length == 4
+  '#{buffer[3]}.#{buffer[2]}.#{buffer[1]}.#{buffer[0]}'
 
