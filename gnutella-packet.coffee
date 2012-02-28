@@ -1,5 +1,10 @@
 ###
 # gnutella-packet.coffee - basic classes for Gnutella packets
+#
+# These classes provide a clean interface to read/write low-level Gnutella
+# packets. The deserialize() method takes in a buffer and returns a
+# GnutellaPacket subclass. The GnutellaPacket.serialize() method generates
+# a sendable buffer
 ###
 
 assert = require('assert')
@@ -83,7 +88,7 @@ class root.GnutellaPacket
       return new Buffer('GNUTELLA OK\n\n')
 
     # Instantiation sanity checks
-    assert.ok payload instanceof Buffer
+    assert.ok Buffer.isBuffer(data)
     assert.ok typeof(@id) == 'string' and @id.length == 16
     assert.ok typeof(@ttl) == 'number'
     assert.ok typeof(@hops) == 'number'
@@ -163,7 +168,7 @@ class root.PongPacket extends root.GnutellaPacket
   #   data: (optional) A Gnutella payload buffer (without the header)
   constructor: (data) ->
     @type = PacketType.PONG
-    if data instanceof Buffer
+    if Buffer.isBuffer(data)
       # extract the pong information from the payload (i.e. the pong descriptor)
       assert.ok data.length == @PAYLOAD_SIZE
       @port = bufferToNumber(data.slice(0, 2))
@@ -197,7 +202,7 @@ class root.QueryPacket extends root.GnutellaPacket
   #   data: (optional) A Gnutella payload buffer (without the header)
   constructor: (data) ->
     @type = PacketType.QUERY
-    if data instanceof Buffer
+    if Buffer.isBuffer(data)
       # extract the pong information from the payload (i.e. the pong descriptor)
       assert.ok data.length >= @MIN_PAYLOAD_SIZE
       @searchCriteria = data.toString('utf8', 2)
@@ -218,7 +223,40 @@ class root.QueryPacket extends root.GnutellaPacket
 # A Gnutella Query Hit Packet
 class root.QueryHitPacket extends root.GnutellaPacket
   MIN_PAYLOAD_SIZE: 11
-  # TODO(advait): Implement this
+  MIN_RESULT_SIZE: 9
+
+  # Args:
+  #   data: (optional) A Gnutella payload buffer (without the header)
+  #       luckily, PingPacket don't have payloads so this should be an
+  #       empty buffer
+  constructor: (data) ->
+    @type = PacketType.QUERYHIT
+    if Buffer.isBuffer(data)
+      assert.ok data.length >= @MIN_PAYLOAD_SIZE
+      @numHits = buffer[0]
+      @port = buffer.readUInt16BE(data, 1)
+      @address = bigEndianToIp(data.slice(3, 7))
+      @speed = buffer.readUInt32BE(data, 7)
+
+      # Parse each result
+      @resultSet = []
+      data = data.slice(MIN_PAYLOAD_SIZE)
+      for i in [0..@numHits]
+        assert.ok data.length >= @MIN_RESULT_SIZE
+        result = new Object()
+        result.fileIndex = buffer.readUInt32BE(data, 0)
+        result.fileSize = buffer.readUInt32BE(data, 4)
+        j = 0
+        while data[8+j] != 0
+          j++
+        result.fileName = buffer.slice(8, 8+j).toString()
+        resultSet.push(result)
+    else
+      throw 'No default QUERYHIT packet implememnted'
+
+  serialize: ->
+    # TODO(advait): Implement
+    return null
 
 
 # A Gnutella Push Packet
@@ -229,7 +267,7 @@ class root.PushPacket extends root.GnutellaPacket
   #   data: (optional) A Gnutella payload buffer (without the header)
   constructor: (data) ->
     @type = PacketType.PUSH
-    if data instanceof Buffer
+    if Buffer.isBuffer(data)
       assert.ok data.length == @PAYLOAD_SIZE
       @serventIdentifier = data.toString('utf8', 0, 16)
       @fileIndex = bufferToNumber(data.slice(16, 20))
