@@ -199,66 +199,6 @@ class root.PongPacket extends root.GnutellaPacket
     super new Buffer(payload)
 
 
-# A Gnutella Connect Packet
-class root.ConnectPacket extends root.GnutellaPacket
-  # Args:
-  #   data: A Buffer (optional)
-  constructor: ->
-    data = data ? new Object()
-    @type = PacketType.CONNECT
-    @ttl = data.ttl ? 1
-    @hops = data.hops ? 0
-
-  serialize: ->
-    super new Buffer(0)
-
-
-# A Gnutella Pong Packet
-class root.PongPacket extends root.GnutellaPacket
-  # Args:
-  #   data: A BUffer (optional)
-  constructor: (data) ->
-    if Buffer.isBuffer(data)
-      # Construct a PongPacket object from a raw Buffer
-      throw 'Createing a PongPacket from a Buffer is not implemented yet'
-
-    # Generic packet attributes
-    # TODO(advait): remove defaults
-    data = data ? new Object()
-    @id = data.id ? "7777777777777777"
-    @type = PacketType.PONG
-    @ttl = data.ttl ? 0
-    @hops = data.hops ? 0
-
-    # Pong-specific packet attributes
-    # TODO(advait): remove defaults
-    @port = data.port ? 1337
-    @ip = data.ip ? '255.255.255.255'
-    @filesShared = data.filesShared ? 0
-    @kbShared = data.kbShared ? 0
-
-  serialize: ->
-    output = new Buffer 14
-
-    # set port
-    portBuffer = numberToBuffer @port, 2
-    portBuffer.copy output, 0
-
-    # set ip
-    ipBuffer = ipToLittleEndian @ip
-    ipBuffer.copy output, 2
-
-    # set filesShared
-    filesSharedBuffer = numberToBuffer @filesShared, 4
-    filesSharedBuffer.copy output, 6
-
-    # set kbShared
-    kbSharedBuffer = numberToBuffer @kbShared, 4
-    kbSharedBuffer.copy output, 10
-
-    super output
-
-
 ##############################################################################
 # Utility methods
 ##############################################################################
