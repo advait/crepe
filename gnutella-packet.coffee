@@ -112,8 +112,7 @@ class root.GnutellaPacket
     output[18] = @hops # set hops
 
     # set Payload Length
-    payloadLengthBuffer = numberToBuffer payload.length, 4
-    payloadLengthBuffer.copy output, @HEADER_SIZE-4
+    output.writeUInt32BE(payload.length, 19)
 
     # set actual Payload
     payload.copy(output, @HEADER_SIZE)
@@ -171,10 +170,10 @@ class root.PongPacket extends root.GnutellaPacket
     if Buffer.isBuffer(data)
       # extract the pong information from the payload (i.e. the pong descriptor)
       assert.ok data.length == @PAYLOAD_SIZE
-      @port = bufferToNumber(data.slice(0, 2))
+      @port = data.readUInt16BE(0)
       @address = littleEndianToIp(data.slice(2, 6))
-      @numFiles = bufferToNumber(data.slice(6, 10))
-      @numKbShared = bufferToNumber(data.slice(10, 14))
+      @numFiles = data.readUInt32BE(6)
+      @numKbShared = data.readUInt32BE(10)
     else  # Fill with default attrs
       # TODO(advait): remove default attrs
       @id ?= "8888888888888888"
@@ -270,9 +269,9 @@ class root.PushPacket extends root.GnutellaPacket
     if Buffer.isBuffer(data)
       assert.ok data.length == @PAYLOAD_SIZE
       @serventIdentifier = data.toString('utf8', 0, 16)
-      @fileIndex = bufferToNumber(data.slice(16, 20))
+      @fileIndex = data.readUInt32BE(16)
       @address = bigEndianToIp(data.slice(20, 24))
-      @port = bufferToNumber(data.slice(24, 26))
+      @port = data.readUInt16BE(24)
     else  # Fill with default attrs
       # TODO(advait): remove default attrs
       @id ?= "8888888888888888"
@@ -294,46 +293,6 @@ class root.PushPacket extends root.GnutellaPacket
 ##############################################################################
 # Utility methods
 ##############################################################################
-
-
-# TODO(advait): Deprecate all these methods in favor of the inbuilt ones:
-# http://nodejs.org/docs/latest/api/buffers.html#buffer.readInt32LE
-
-
-# Converts a JS number n into a Big Endian integer buffer
-# Args:
-#   n: the number to convert (floored to an Integer)
-#   bufferSize: the number of bytes in the output buffer (default = 4)
-# Returns:
-#   A Buffer of size bufferSize that is the big endian integer representation
-#   of n.
-numberToBuffer = (n, bufferSize) ->
-  n = Math.floor n
-  bufferSize ?= 4
-  b = new Buffer bufferSize
-
-  for i in [0..b.length-1]
-    divisor = Math.pow 256, (b.length - 1 - i)
-    value = Math.floor (n / divisor)
-    b[i] = (value % 256)
-    n = n % divisor
-  return b
-root.numberToBuffer = numberToBuffer
-
-
-# Parses a Buffer as a Big Endian Int and returns the correspodning JS Number
-# Args:
-#   buffer: the Buffer object
-# Returns:
-#   A JS Number
-bufferToNumber = (buffer) ->
-  assert.ok Buffer.isBuffer buffer
-  accum = 0
-  for i in [0..buffer.length-1]
-    accum *= 256
-    accum += buffer[i]
-  return accum
-root.bufferToNumber = bufferToNumber
 
 
 # Converts an ip address (string) into a Big Endian byte buffer
