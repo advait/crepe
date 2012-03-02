@@ -47,9 +47,11 @@ class exports.FileServer
             response.write file, "binary"
             response.end()
       else if request.method == "PUT"
-        console.log "PUT method not yet defined"
+        # You can test uploading files using:
+        # curl --upload-file <local_file_path> 
+        #   http://<server_ip>:<port>/<upload_file_name>
         console.log "User uploading file: #{filename}"
-        buf = null
+        buf = new Buffer(1024)
 
         request.setEncoding "binary"
 
@@ -58,11 +60,15 @@ class exports.FileServer
           buf += data
 
         request.on "end", ->
-          console.log 'File Uploaded'
           fs.writeFile filename, buf, "binary", (err) ->
             if err
-              throw err
+              response.writeHead 500
+              response.write "#{err}\n"
+              response.end()
             else
+              response.writeHead 200
+              response.write "Saved File success!\n"
+              response.end()
               console.log "Saved File success!"
 
   listen: (port) ->
