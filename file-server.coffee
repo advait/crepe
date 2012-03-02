@@ -24,26 +24,46 @@ class exports.FileServer
       file = decodeURIComponent url.parse(request.url).pathname
       filename = path.join(shareFolder, file)
       console.log "Filename: #{file}"
-      console.log "Filepath: #{filename}"
 
-      # Send the file back if it exists, or return if there's an error.
-      path.exists filename, (exists) ->
-        if (!exists)
-          response.writeHead 404, {"Content-Type": "text/plain" }
-          response.write "404 Not Found\n"
-          response.end()
-          return
+      if request.method == "GET"
+        console.log "User downloading file: #{filename}"
 
-        fs.readFile filename, "binary", (err, file) ->
-          if(err)     
-            response.writeHead 500, {"Content-Type": "text/plain"}
-            response.write "#{err}\n"
+        # Send the file back if it exists, or return if there's an error.
+        path.exists filename, (exists) ->
+          if (!exists)
+            response.writeHead 404, {"Content-Type": "text/plain" }
+            response.write "404 Not Found\n"
             response.end()
             return
 
-          response.writeHead 200
-          response.write file, "binary"
-          response.end()
+          fs.readFile filename, "binary", (err, file) ->
+            if(err)     
+              response.writeHead 500, {"Content-Type": "text/plain"}
+              response.write "#{err}\n"
+              response.end()
+              return
+
+            response.writeHead 200
+            response.write file, "binary"
+            response.end()
+      else if request.method == "PUT"
+        console.log "PUT method not yet defined"
+        console.log "User uploading file: #{filename}"
+        buf = null
+
+        request.setEncoding "binary"
+
+        request.on "data", (data) ->
+          # console.log data.toString()
+          buf += data
+
+        request.on "end", ->
+          console.log 'File Uploaded'
+          fs.writeFile filename, buf, "binary", (err) ->
+            if err
+              throw err
+            else
+              console.log "Saved File success!"
 
   listen: (port) ->
     @server.listen port
