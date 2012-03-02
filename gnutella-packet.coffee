@@ -250,12 +250,45 @@ class root.QueryHitPacket extends root.GnutellaPacket
           j++
         result.fileName = buffer.slice(8, 8+j).toString()
         resultSet.push(result)
+        data = data.slice(8+j)
+
+      assert.ok data.length == 16
+      @serventIdentifier = data.toString('ascii', 0, 16)
     else
       throw 'No default QUERYHIT packet implememnted'
 
   serialize: ->
-    # TODO(advait): Implement
-    return null
+    header = new Buffer(MIN_PAYLOAD_SIZE)
+    header.writeUInt8(@numHits, 0)
+    header.writeUInt16BE(@port, 1)
+    addressBuffer = ipToBigEndian(@address)
+    addressBuffer.copy(header, 3)
+    header.writeUInt32BE(@speed, 7)
+
+    # Parse each result
+    resultBuffers = []
+    totalResultBuffersLength = 0
+    for result in @resultSet
+      resultLength = 4 + 4 + result.fileName.length + 2
+      resultBuffer = new Buffer(resultLength)
+      resultBuffer.writeUInt32BE(result.fileIndex, 0)
+      resultBuffer.writeUInt32BE(result.fileSize, 4)
+      resultBuffer.write(result.fileName, 8)
+      resultBuffer.writeUInt16BE(0x0000, resultLength-2)  # Null Bytes
+      resultBuffers.push(resultBuffer)
+      totalResultBuffersLength += resultBuffer.length
+
+    # Create final output buffer (4 bytes for the servent identifier)
+    totalLength = header.length + totalResultBuffersLength + 4
+    payload = new Buffer(totalLength)
+    header.copy(payload, 0)
+    currentIndex = MIN_PAYLOAD_SIZE
+    for b in resultBuffers
+      b.copy(payload, currentIndex)
+      currentIndex += b.length
+
+    payload.write(@serventIdentifier, currentIndex)
+    super payload
 
 
 # A Gnutella Push Packet
