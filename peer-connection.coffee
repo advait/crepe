@@ -4,7 +4,11 @@ gp = require('./gnutella-packet.js')
 # Enable exports
 root = exports ? this  # http://stackoverflow.com/questions/4214731/coffeescript-global-variables
 
-# Generic socket handler for both server and client sockets
+# Parameters:
+#   socket - The socket that will have it's handler set
+#   context - An object that has the neighborhood, and other tables needed to route packets.
+# Function:
+#   Binds a supplied socket to a data handler
 root.createSocketHandler = (socket, context) ->
   
   # Error handler
@@ -18,18 +22,21 @@ root.createSocketHandler = (socket, context) ->
 
       # handle connect
       when gp.PacketType.CONNECT
-        console.log "received CONNECT"
+        console.log "received CONNECT #{packet.ip}:#{packet.port}"
         # Add to neighborhood if it's a new neighbor
-        if !context.neighbors.at(packet.ip, packet.port)
-          context.neighbors.add(packet.ip, packet.port, socket)
-          packet = new gp.ConnectOKPacket()
-          socket.write(packet.serialize())
+        if context.neighbors.ableToAdd(packet.ip, packet.port)
+          connectOKPacket = new gp.ConnectOKPacket()
+          try
+            socket.write(connectOKPacket.serialize())
+            context.neighbors.add(packet.ip, packet.port, socket)
+          catch error
+            console.log "sending CONNECTOK FAILED!"
         break
 
       # handle connect ok
       when gp.PacketType.CONNECTOK
         console.log "received CONNECTOK"
-        if !context.neighbors.at(socket.remoteAddress, socket.remotePort)
+        if context.neighbors.ableToAdd(socket.remoteAddress, socket.remotePort)
           context.neighbors.add(socket.remoteAddress, socket.remotePort, socket)
         break
 
@@ -50,10 +57,16 @@ root.createSocketHandler = (socket, context) ->
         pong.port = serverAddress.port
         pong.numFiles = 1337  # TODO(advait): Fix this
         pong.numKbShared = 1337  # TODO(advait): Fix
-        socket.write(pong.serialize())
+        try
+          socket.write(pong.serialize())
+        catch error
+          console.log "replying PONG FAILED!"
+          context.neighbors.remove(socket.remoteAddress, socket.remotePort)
 
         # Forward ping to other neighbors
-        if context.forwarding[packet.id] == undefined
+        packet.ttl--
+        packet.hops++
+        if context.forwarding[packet.id] == undefined && packet.ttl > 0
           console.log "forwarding PING:#{packet.id} to all neighbors"
           context.forwarding[packet.id] = socket
           context.neighbors.sendToAll(data, socket)
@@ -69,7 +82,10 @@ root.createSocketHandler = (socket, context) ->
         # Forward the pong back to where it originated
         else if context.forwarding[packet.id]
           console.log "Forwarding PONG:#{packet.id}"
-          context.forwarding[packet.id].write(data)
+          try
+            context.forwarding[packet.id].write(data)
+          catch error
+            console.log "Forwarding PONG FAILED!"
         break
 
       # handle push
@@ -89,9 +105,12 @@ root.createSocketHandler = (socket, context) ->
         console.log "Unknown command:"
         console.log data
   
-
-# Creates an outgoing socket to a node specified at address:port. Context is an object containing
-# the neighborhood, origin table, and forwarding table.
+# Parameters:
+#   address - The address of the destination peer (e.g. '127.0.0.1')
+#   port - The port of the destination peer (e.g. '12345')
+#   context - An object that contains the neighborhood and tables needed to route packets
+# Function:
+#   Creates a connection to the peer specified by address and port
 root.createPeerConnection = (address, port, context) ->
   socket = new net.Socket() 
   socket.setNoDelay()
@@ -104,6 +123,9 @@ root.createPeerConnection = (address, port, context) ->
     serverAddress = context.crepeServer.address()
     connectPacket.ip = serverAddress.address
     connectPacket.port = serverAddress.port
-    socket.write(connectPacket.serialize())
+    try
+      socket.write(connectPacket.serialize())
+    catch error
+      console.log "Sending connect request FAILED!"
 
   socket.connect(port, address)
