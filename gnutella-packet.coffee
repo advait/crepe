@@ -12,6 +12,13 @@ assert = require('assert')
 # Enable exports
 root = exports ? this  # http://stackoverflow.com/questions/4214731/coffeescript-global-variables
 
+randomString = ->
+  charSet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  result = ''
+  for i in [0..15]
+    randomPoz = Math.floor(Math.random() * charSet.length);
+    result += charSet.substring(randomPoz,randomPoz+1);
+  return result
 
 ##############################################################################
 # Deserialize
@@ -25,20 +32,21 @@ root = exports ? this  # http://stackoverflow.com/questions/4214731/coffeescript
 # Returns:
 #   A GnutellaPacket subclass corresponding to the type of packet we got.
 root.deserialize = (buffer) ->
-  assert.ok buffer.isBuffer buffer
+  assert.ok Buffer.isBuffer buffer
   s = buffer.toString()
 
-  if s == 'GNUTELLA CONNECT/0.4\n\n'
-    return new root.ConnectPacket()
+  if s.slice(0,22) == 'GNUTELLA CONNECT/0.4\n\n'
+    return new root.ConnectPacket(buffer)
 
   if s == 'GNUTELLA OK\n\n'
     return new root.ConnectOKPacket()
 
-  assert.ok buffer.length >= root.GnutellaPacket.HEADER_SIZE
+  #assert.ok buffer.length >= root.GnutellaPacket.HEADER_SIZE
   payloadDescriptor = buffer[16]  # see spec!
 
   output = null
-  payloadBuffer = buffer.slice(root.GnutellaPacket.HEADER_SIZE)
+  #payloadBuffer = buffer.slice(root.GnutellaPacket.HEADER_SIZE)
+  payloadBuffer = buffer.slice(23)
   switch payloadDescriptor
     when 0x00 then output = new root.PingPacket(payloadBuffer)
     when 0x01 then output = new root.PongPacket(payloadBuffer)
@@ -52,7 +60,7 @@ root.deserialize = (buffer) ->
   output.ttl = buffer[17]
   output.hops = buffer[18]
 
-    
+  return output
 
 ##############################################################################
 # GnutellaPacket implementations
@@ -69,6 +77,8 @@ PacketType =
   QUERYHIT: 6
   PUSH: 7
   CORRUPT: -1
+
+root.PacketType = PacketType
 
 
 # Gnutella Packet base class
@@ -88,7 +98,7 @@ class root.GnutellaPacket
       return new Buffer('GNUTELLA OK\n\n')
 
     # Instantiation sanity checks
-    assert.ok Buffer.isBuffer(data)
+    assert.ok Buffer.isBuffer(payload)
     assert.ok typeof(@id) == 'string' and @id.length == 16
     assert.ok typeof(@ttl) == 'number'
     assert.ok typeof(@hops) == 'number'
@@ -131,8 +141,12 @@ class root.GnutellaPacket
 class root.ConnectPacket extends root.GnutellaPacket
   constructor: (data) ->
     @type = PacketType.CONNECT
+    if Buffer.isBuffer(data)
+      @ip = data.toString('ascii').split(':')[1]
+      @port = data.toString('ascii').split(':')[2]
 
-  serialize: -> new Buffer 'GNUTELLA CONNECT/0.4\n\n', 'ascii'
+  serialize: ->
+    return new Buffer("GNUTELLA CONNECT/0.4\n\n:#{@ip}:#{@port}", 'ascii')
     
 
 # A Gnutella Connect OK packet
@@ -154,6 +168,10 @@ class root.PingPacket extends root.GnutellaPacket
     if Buffer.isBuffer(data)
       assert.ok data.length == 0
     # Note: Ping Packets don't have any ping-specific attributes
+    #@id ?= "2222222222222222"
+    @id ?= randomString()
+    @ttl ?= 7
+    @hops ?= 0
 
   serialize: ->
     super new Buffer(0)
@@ -169,14 +187,15 @@ class root.PongPacket extends root.GnutellaPacket
     @type = PacketType.PONG
     if Buffer.isBuffer(data)
       # extract the pong information from the payload (i.e. the pong descriptor)
-      assert.ok data.length == @PAYLOAD_SIZE
+      #assert.ok data.length == @PAYLOAD_SIZE
       @port = data.readUInt16BE(0)
       @address = littleEndianToIp(data.slice(2, 6))
       @numFiles = data.readUInt32BE(6)
       @numKbShared = data.readUInt32BE(10)
     else  # Fill with default attrs
       # TODO(advait): remove default attrs
-      @id ?= "8888888888888888"
+      #@id ?= "2222222222222222"
+      @id ?= randomString()
       @ttl ?= 7
       @hops ?= 0
       @port ?= 0
@@ -239,7 +258,7 @@ class root.QueryHitPacket extends root.GnutellaPacket
 
       # Parse each result
       @resultSet = []
-      data = data.slice(MIN_PAYLOAD_SIZE)
+      data = data.slice(@MIN_PAYLOAD_SIZE)
       for i in [0..@numHits]
         assert.ok data.length >= @MIN_RESULT_SIZE
         result = new Object()
@@ -258,7 +277,7 @@ class root.QueryHitPacket extends root.GnutellaPacket
       throw 'No default QUERYHIT packet implememnted'
 
   serialize: ->
-    header = new Buffer(MIN_PAYLOAD_SIZE)
+    header = new Buffer(@MIN_PAYLOAD_SIZE)
     header.writeUInt8(@numHits, 0)
     header.writeUInt16BE(@port, 1)
     addressBuffer = ipToBigEndian(@address)
@@ -282,7 +301,7 @@ class root.QueryHitPacket extends root.GnutellaPacket
     totalLength = header.length + totalResultBuffersLength + 4
     payload = new Buffer(totalLength)
     header.copy(payload, 0)
-    currentIndex = MIN_PAYLOAD_SIZE
+    currentIndex = @MIN_PAYLOAD_SIZE
     for b in resultBuffers
       b.copy(payload, currentIndex)
       currentIndex += b.length
@@ -316,7 +335,7 @@ class root.PushPacket extends root.GnutellaPacket
       @port ?= 0
 
   serialize: ->
-    payload = new Buffer(PAYLOAD_SIZE)
+    payload = new Buffer(@PAYLOAD_SIZE)
     payload.write(@serventIdentifier, 0, 16)
     payload.writeUInt32BE(@fileIndex, 16)
     ipToBigEndian(@address).copy(payload, 20)
