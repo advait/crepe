@@ -61,6 +61,7 @@ class exports.FileServer
 
         request.on "end", ->
           fs.writeFile filename, buf, "binary", (err) ->
+            # Throw 500 on any errors. Otherwise, 200 is fine.
             if err
               response.writeHead 500
               response.write "#{err}\n"

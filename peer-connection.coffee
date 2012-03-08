@@ -130,4 +130,5 @@ root.createPeerConnection = (address, port, context) ->
     catch error
       console.log "Sending connect request FAILED!"
 
+  console.log "hello socket: #{address}:#{port}"
   socket.connect(port, address)
