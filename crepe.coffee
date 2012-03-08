@@ -17,8 +17,8 @@ nh = require('./neighborhood.js')
 pc = require('./peer-connection.js')
 FileServer = require('./file-server').FileServer
 
-bootstrap_port = process.argv[2]
-bootstrap_host = process.argv[3]
+bootstrap_host = process.argv[2]
+bootstrap_port = process.argv[3]
 shared_folder = process.cwd()
 
 context = new Object()
