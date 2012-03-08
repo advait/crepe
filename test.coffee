@@ -25,9 +25,3 @@ console.log 'Passed Pong Packet creation tests!'
 
 console.log "\n--------------------------------------------\n"
 
-
-# Test numberToBuffer and bufferToNumber
-for i in [4..15]
-  for j in [100..255]
-    assert.ok (gp.bufferToNumber (gp.numberToBuffer j, i)) == j
-console.log 'Passed numberToBuffer and bufferToNumber tests!'

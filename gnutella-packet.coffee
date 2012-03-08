@@ -251,10 +251,10 @@ class root.QueryHitPacket extends root.GnutellaPacket
     @type = PacketType.QUERYHIT
     if Buffer.isBuffer(data)
       assert.ok data.length >= @MIN_PAYLOAD_SIZE
-      @numHits = buffer[0]
-      @port = buffer.readUInt16BE(data, 1)
+      @numHits = data[0]
+      @port = data.readUInt16BE(1)
       @address = bigEndianToIp(data.slice(3, 7))
-      @speed = buffer.readUInt32BE(data, 7)
+      @speed = data.readUInt32BE(7)
 
       # Parse each result
       @resultSet = []
@@ -262,19 +262,25 @@ class root.QueryHitPacket extends root.GnutellaPacket
       for i in [0..@numHits]
         assert.ok data.length >= @MIN_RESULT_SIZE
         result = new Object()
-        result.fileIndex = buffer.readUInt32BE(data, 0)
-        result.fileSize = buffer.readUInt32BE(data, 4)
+        result.fileIndex = data.readUInt32BE(0)
+        result.fileSize = data.readUInt32BE(4)
         j = 0
         while data[8+j] != 0
           j++
-        result.fileName = buffer.slice(8, 8+j).toString()
+        result.fileName = data.slice(8, 8+j).toString()
         resultSet.push(result)
         data = data.slice(8+j)
 
       assert.ok data.length == 16
       @serventIdentifier = data.toString('ascii', 0, 16)
     else
-      throw 'No default QUERYHIT packet implememnted'
+      # Set default attributes
+      @numHits = 0
+      @port = 0
+      @address = '0.0.0.0'
+      @speed = 0
+      @resultSet = []
+      @serventIdentifier = '0123456789abcdef'
 
   serialize: ->
     header = new Buffer(@MIN_PAYLOAD_SIZE)
@@ -308,6 +314,18 @@ class root.QueryHitPacket extends root.GnutellaPacket
 
     payload.write(@serventIdentifier, currentIndex)
     super payload
+
+  # Adds a result to this packet
+  # Args:
+  #   resultObject: A simple object with three key/values:
+  #       fileIndex: Integer uniquely identifying the file
+  #       fileSize: Integer file size in bytes
+  #       fileName: String of the file name
+  addResult: (resultObject) ->
+    assert.ok resultObject.fileIndex?
+    assert.ok resultObject.fileSize?
+    assert.ok resultObject.fileName?
+    @resultSet.push resultObject
 
 
 # A Gnutella Push Packet
