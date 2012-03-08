@@ -17,6 +17,8 @@ root.createSocketHandler = (socket, context) ->
 
   # Incoming data handler
   socket.on 'data', (data) ->
+    console.log "From buffer:"
+    console.log data.toString()
     packet = gp.deserialize(data)
     switch packet.type
 
