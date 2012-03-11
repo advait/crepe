@@ -35,7 +35,7 @@ root.deserialize = (buffer) ->
   assert.ok Buffer.isBuffer buffer
   s = buffer.toString()
 
-  if s.slice(0,22) == 'GNUTELLA CONNECT/0.4\n\n'
+  if s == 'GNUTELLA CONNECT/0.4\n\n'
     return new root.ConnectPacket(buffer)
 
   if s == 'GNUTELLA OK\n\n'
@@ -141,12 +141,9 @@ class root.GnutellaPacket
 class root.ConnectPacket extends root.GnutellaPacket
   constructor: (data) ->
     @type = PacketType.CONNECT
-    if Buffer.isBuffer(data)
-      @ip = data.toString('ascii').split(':')[1]
-      @port = data.toString('ascii').split(':')[2]
 
   serialize: ->
-    return new Buffer("GNUTELLA CONNECT/0.4\n\n:#{@ip}:#{@port}", 'ascii')
+    return new Buffer("GNUTELLA CONNECT/0.4\n\n", 'ascii')
     
 
 # A Gnutella Connect OK packet
