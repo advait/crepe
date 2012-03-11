@@ -15,7 +15,7 @@ root = exports ? this  # http://stackoverflow.com/questions/4214731/coffeescript
 
 
 # Internal tables used for routing
-origin = {} # Stores {packet.id+packet.type -> (socket, type)} mappings
+origin = {} # Stores {packet.id -> packet} mappings
 mitm = {} # Stores {packet.id -> socket} mappings
 
 
@@ -35,6 +35,10 @@ serverAddress =
 #   address: String - IP address
 #   port: Number - port
 root.connect = (address, port) ->
+  if !port?
+    port = address
+    address = '127.0.0.1'
+
   socket = new net.Socket()
   socket.setNoDelay()
 
@@ -82,7 +86,11 @@ root.connect = (address, port) ->
         pong.address = serverAddress.address
         pong.port = serverAddress.port
         pong.ttl = 1
-        socket.write(pong.serialize())
+        try
+          socket.write(pong.serialize())
+        catch error
+          console.log "replying direct PONG FAILED"
+        break
 
       # handle pong
       when gp.PacketType.PONG
@@ -90,12 +98,12 @@ root.connect = (address, port) ->
         # Try to connect to peer if the pong is intended for this node
         # TODO: decide if we are able to add any more peers(Kevin)
         if origin[packet.id] && !nh.at(packet.address, packet.port) &&
-              origin[packet.id].type == gp.PacketType.PONG
+              origin[packet.id].type == gp.PacketType.PING
           console.log "Trying to connect to #{packet.address}:#{packet.port}"
           root.connect(packet.address, packet.port)
 
         # Forward the pong back to where it originated
-        else if mitm[packet.id]
+        else if mitm[packet.id]?
           console.log "Forwarding PONG:#{packet.id}"
           try
             mitm[packet.id].write(data)
@@ -169,14 +177,13 @@ root.connectionHandler = (socket) ->
         connectOKPacket = new gp.ConnectOKPacket()
         ping = new gp.PingPacket()
         ping.ttl = 1
-        origin[ping.id] = { 'socket': socket, 'type': gp.PacketType.PING}
+        origin[ping.id] = ping
         try
           console.log "sending CONNECTOK to #{socket.remoteAddress}:#{socket.remotePort}"
-          socket.write(connectOKPacket.serialize())
-
-          # TODO(Kevin): decide if we want to send ping or not
-          console.log "sending PING:#{ping.id} to #{socket.remoteAddress}:#{socket.remotePort}"
-          socket.write(ping.serialize())
+          socket.write connectOKPacket.serialize(), 'binary', ->
+            # TODO(Kevin): decide if we want to send ping or not
+            console.log "sending direct PING:#{ping.id} to #{socket.remoteAddress}:#{socket.remotePort}"
+            socket.write(ping.serialize())
         catch error
           console.log "sending CONNECTOK FAILED!"
         break
@@ -185,7 +192,7 @@ root.connectionHandler = (socket) ->
       when gp.PacketType.PING
         console.log "received PING:#{packet.id}"
 
-        if origin[packet.id] || mitm[packet.id]
+        if origin[packet.id]? || mitm[packet.id]?
           console.log "drop PING because already seen"
           break
 
@@ -209,14 +216,15 @@ root.connectionHandler = (socket) ->
         if packet.ttl > 0
           console.log "forwarding PING:#{packet.id} to all neighbors"
           mitm[packet.id] = socket
-          nh.sendToAll(data, socket)
+          nh.sendToAll(data)
+        break
 
       # handle special pong because immediate peer wants to connect
       when gp.PacketType.PONG
         console.log "received direct PONG:#{packet.id} #{packet.address}:#{packet.port}"
-        if origin[packet.id] && origin[packet.id].type == gp.PacketType.PING &&
+        if origin[packet.id]? && origin[packet.id].type == gp.PacketType.PING &&
             nh.ableToAdd(packet.address, packet.port) && packet.ttl == 1 && packet.hops == 0
-          nh.add(packet.address, packet.port, socket)
+          root.connect(packet.address, packet.port)
         break
 
       # handle push
@@ -238,6 +246,12 @@ root.listeningHandler = ->
   serverAddress = this.address()
   console.log "server is now listening on #{serverAddress.address}:#{serverAddress.port}"
   console.log "CTRL+C to exit"
+  setInterval(updateNeighborhood, 10000)
+
+
+################################################################################
+# Neighborhood utility methods
+################################################################################
 
 # Neighborhood object to handle peers in the neighborhood set
 nh =
@@ -264,7 +278,7 @@ nh =
 
   # Return true if a new peer can be added to the neighborhood
   ableToAdd: (ip, port) ->
-    if !@at(ip, port) && @count < @MAX_PEERS
+    if !@at(ip, port)? && @count < @MAX_PEERS
       return true
     else
       return false
@@ -272,10 +286,10 @@ nh =
   # Send data to all peers in the neighborhood but do not send to the peer
   # associated with the "exclude" socket. The "exclude" paramter is used to exclude
   # the peer that sent the incoming ping or query.
-  sendToAll: (data, exclude) ->
+  sendToAll: (data) ->
     for node, socket of @neighbors
       # ignore the excluded socket and undefined sockets
-      if socket != exclude && socket != undefined
+      if socket?
         try
           socket.write data
         catch error
@@ -287,5 +301,15 @@ nh =
   printAll: ->
     console.log "List of neighbors:"
     for node, socket of @neighbors
-      if socket != undefined
+      if socket?
         console.log "#{node}"
+
+updateNeighborhood = ->
+  # Indicate that this node sent the original ping
+  ping = new gp.PingPacket()
+  origin[ping.id] = ping
+
+  # Flood neighbors with pings
+  console.log "Flood neighbors with ping:#{ping.id}"
+  nh.printAll()
+  nh.sendToAll(ping.serialize())
