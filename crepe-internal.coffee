@@ -7,8 +7,11 @@
 net = require('net')
 fs = require('fs')
 gp = require('./gnutella-packet.js')
+assert = require('assert')
 FileServer = require('./file-server').FileServer
+path = require('path')
 
+shared_folder = process.cwd()
 
 # Enable exports
 root = exports ? this  # http://stackoverflow.com/questions/4214731/coffeescript-global-variables
@@ -114,7 +117,21 @@ root.connect = (address, port) ->
       # handle query hit
       when gp.PacketType.QUERYHIT
         console.log "received QUERYHIT:#{packet.id}"
-        #TODO: forward query hit
+        if origin[packet.id]
+          console.log "HITS: #{packet.address}:#{packet.port}"
+          for result in packet.resultSet
+            result_string = "filename:#{result.fileName}, "
+            result_string += "size:#{result.fileSize}, "
+            result_string += "index:#{result.fileIndex}, "
+            result_string += "serventID:#{packet.serventIdentifier}"
+            console.log result_string
+
+        else if mitm[packet.id]?
+          console.log "forwarding QUERYHIT:#{packet.id}"
+          try
+            mitm[packet.id].write(data)
+          catch error
+            console.log "forwarding QUERHIT failed"
         break
 
       # default
@@ -132,7 +149,10 @@ root.connect = (address, port) ->
 #     Args: 
 #       queryHit - A QueryHit packet object representing the result
 root.search = (query, resultCallback) ->
-  assert.ok 1
+  q = new gp.QueryPacket()
+  q.searchCriteria = query
+  origin[q.id] = q
+  nh.sendToAll(q.serialize())
 
 # This method attempts to download the file identified by fileIdentifier
 # Args:
@@ -181,9 +201,14 @@ root.connectionHandler = (socket) ->
         try
           console.log "sending CONNECTOK to #{socket.remoteAddress}:#{socket.remotePort}"
           socket.write connectOKPacket.serialize(), 'binary', ->
-            # TODO(Kevin): decide if we want to send ping or not
+            # TODO(Kevin): decide if we want to send ping or not. Might not want to add
+            # another peer because we have reached the peer limit
             console.log "sending direct PING:#{ping.id} to #{socket.remoteAddress}:#{socket.remotePort}"
-            socket.write(ping.serialize())
+
+            #TODO: FIX THIS UGLY HACK
+            # The data buffer on the other end of this socket queues up the CONNECTOK
+            # and PING packets. This causes the packet to be misinterpreted.
+            setTimeout( -> socket.write(ping.serialize()), 2000)
         catch error
           console.log "sending CONNECTOK FAILED!"
         break
@@ -229,10 +254,54 @@ root.connectionHandler = (socket) ->
 
       # handle push
       when gp.PacketType.PUSH
+        console.log "received PUSH:#{packet.id}"
         break
 
       # handle query
       when gp.PacketType.QUERY
+        console.log "received QUERY:#{packet.id} search:#{packet.searchCriteria}"
+        if origin[packet.id]? || mitm[packet.id]?
+          console.log "drop QUERY because already seen"
+          break
+
+        # Forward query to all neighbors
+        console.log "forwarding Query:#{packet.id}"
+        mitm[packet.id] = socket
+        nh.sendToAll(data)
+
+        # Send a Query Hit if we find a match
+        # TODO: use some globbing to find partial match instead of exact
+        try
+          stats = fs.statSync(path.join(shared_folder, packet.searchCriteria))
+        catch error
+          console.log "No Files matched:#{packet.searchCriteria}"
+          break
+        if stats.isFile()
+          queryHit = new gp.QueryHitPacket()
+          queryHit.address = serverAddress.address
+          queryHit.port = serverAddress.port
+          queryHit.id = packet.id
+          queryHit.numHits = 2
+          result = new Object()
+          result.fileIndex = 1
+          result.fileSize = stats.size
+          result.fileName = packet.searchCriteria
+          queryHit.addResult(result)
+
+          # Test adding more than one result
+          result = new Object()
+          result.fileIndex = 1337
+          result.fileSize = 13371337
+          result.fileName = "FAKE DATA!"
+          queryHit.addResult(result)
+
+          console.log "sending QUERYHIT:#{packet.id}"
+          try
+            socket.write(queryHit.serialize())
+          catch error
+            console.log "Sending QUERYHIT failed: #{error}"
+        else
+          console.log "Can't send directory:#{packet.searchCriteria}"
         break
 
       # default
@@ -255,7 +324,7 @@ root.listeningHandler = ->
 
 # Neighborhood object to handle peers in the neighborhood set
 nh =
-  MAX_PEERS : 2
+  MAX_PEERS : 5
   neighbors : {}
   count : 0
 
@@ -293,6 +362,7 @@ nh =
         try
           socket.write data
         catch error
+          console.log "PEER ERROR: #{error}"
           console.log "peer #{node} died. Removing #{node}"
           @neighbors[node] = undefined
           @count--

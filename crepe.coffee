@@ -33,7 +33,7 @@ crepeServer.on 'connection', ci.connectionHandler
 # Bind and run!
 crepeServer.listen 0, '127.0.0.1'
 
-repl.start('command>').context.connect = ci.connect
+repl.start('command>').context.ci = ci
 
 ## Timer to keep probing network
 #updateNeighborhood = ->

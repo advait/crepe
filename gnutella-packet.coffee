@@ -12,13 +12,16 @@ assert = require('assert')
 # Enable exports
 root = exports ? this  # http://stackoverflow.com/questions/4214731/coffeescript-global-variables
 
+# This method returns a random 16 byte string
 randomString = ->
   charSet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
   result = ''
   for i in [0..15]
-    randomPoz = Math.floor(Math.random() * charSet.length);
-    result += charSet.substring(randomPoz,randomPoz+1);
+    randomPoz = Math.floor(Math.random() * charSet.length)
+    result += charSet.substring(randomPoz,randomPoz+1)
   return result
+
+root.randomString = randomString
 
 ##############################################################################
 # Deserialize
@@ -41,12 +44,11 @@ root.deserialize = (buffer) ->
   if s == 'GNUTELLA OK\n\n'
     return new root.ConnectOKPacket()
 
-  #assert.ok buffer.length >= root.GnutellaPacket.HEADER_SIZE
+  assert.ok buffer.length >= root.GnutellaPacket::HEADER_SIZE
   payloadDescriptor = buffer[16]  # see spec!
 
   output = null
-  #payloadBuffer = buffer.slice(root.GnutellaPacket.HEADER_SIZE)
-  payloadBuffer = buffer.slice(23)
+  payloadBuffer = buffer.slice(root.GnutellaPacket::HEADER_SIZE)
   switch payloadDescriptor
     when 0x00 then output = new root.PingPacket(payloadBuffer)
     when 0x01 then output = new root.PongPacket(payloadBuffer)
@@ -220,18 +222,21 @@ class root.QueryPacket extends root.GnutellaPacket
     if Buffer.isBuffer(data)
       # extract the pong information from the payload (i.e. the pong descriptor)
       assert.ok data.length >= @MIN_PAYLOAD_SIZE
-      @searchCriteria = data.toString('utf8', 2)
+      @speed = data.readUInt16BE(0)
+      @searchCriteria = data.toString('utf8', 2, data.length - 1)
     else  # Fill with default attrs
       # TODO(advait): remove default attrs
-      @id ?= "8888888888888888"
+      @id ?= randomString()
       @ttl ?= 7
       @hops ?= 0
       @searchCriteria ?= 'hello world'
+      @speed ?= 1337
 
   serialize: ->
-    payload = new Buffer(@searchCriteria.length + 1)
-    payload.write(@searchCriteria)
-    payload[@searchCriteria] = 0  # Null terminator
+    payload = new Buffer(@searchCriteria.length + 3)
+    payload.writeUInt16BE(@speed, 0)
+    payload.write(@searchCriteria, 2)
+    payload[payload.length - 1] = 0  # Null terminator
     super payload
 
 
@@ -256,7 +261,7 @@ class root.QueryHitPacket extends root.GnutellaPacket
       # Parse each result
       @resultSet = []
       data = data.slice(@MIN_PAYLOAD_SIZE)
-      for i in [0..@numHits]
+      for i in [1..@numHits]
         assert.ok data.length >= @MIN_RESULT_SIZE
         result = new Object()
         result.fileIndex = data.readUInt32BE(0)
@@ -265,13 +270,16 @@ class root.QueryHitPacket extends root.GnutellaPacket
         while data[8+j] != 0
           j++
         result.fileName = data.slice(8, 8+j).toString()
-        resultSet.push(result)
-        data = data.slice(8+j)
+        @resultSet.push(result)
+        data = data.slice(8+j+2)
 
       assert.ok data.length == 16
       @serventIdentifier = data.toString('ascii', 0, 16)
     else
       # Set default attributes
+      @id = randomString()
+      @ttl = 7
+      @hops = 0
       @numHits = 0
       @port = 0
       @address = '0.0.0.0'
@@ -300,8 +308,8 @@ class root.QueryHitPacket extends root.GnutellaPacket
       resultBuffers.push(resultBuffer)
       totalResultBuffersLength += resultBuffer.length
 
-    # Create final output buffer (4 bytes for the servent identifier)
-    totalLength = header.length + totalResultBuffersLength + 4
+    # Create final output buffer (16 bytes for the servent identifier)
+    totalLength = header.length + totalResultBuffersLength + 16
     payload = new Buffer(totalLength)
     header.copy(payload, 0)
     currentIndex = @MIN_PAYLOAD_SIZE
@@ -309,7 +317,7 @@ class root.QueryHitPacket extends root.GnutellaPacket
       b.copy(payload, currentIndex)
       currentIndex += b.length
 
-    payload.write(@serventIdentifier, currentIndex)
+    payload.write(@serventIdentifier, currentIndex, 16, 'utf8')
     super payload
 
   # Adds a result to this packet
