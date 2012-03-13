@@ -208,7 +208,12 @@ root.connectionHandler = (socket) ->
             #TODO: FIX THIS UGLY HACK
             # The data buffer on the other end of this socket queues up the CONNECTOK
             # and PING packets. This causes the packet to be misinterpreted.
-            setTimeout( -> socket.write(ping.serialize()), 2000)
+            write_serialize = ->
+              try
+                socket.write(ping.serialize())
+              catch error
+                console.log "failed to send DIRECT PING"
+            setTimeout(write_serialize, 2000)
         catch error
           console.log "sending CONNECTOK FAILED!"
         break

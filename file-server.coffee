@@ -37,7 +37,7 @@ class exports.FileServer
             return
 
           fs.readFile filename, "binary", (err, file) ->
-            if(err)     
+            if(err)
               response.writeHead 500, {"Content-Type": "text/plain"}
               response.write "#{err}\n"
               response.end()
