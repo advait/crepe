@@ -3,30 +3,52 @@
 # and exposes a few useful methods as UI hooks
 ###
 
+# Comment out this method to enable debug messages
+console.log = ->
+  return
+
 # Imports
 net = require('net')
 fs = require('fs')
 gp = require('./gnutella-packet.js')
 assert = require('assert')
-FileServer = require('./file-server').FileServer
 path = require('path')
-
 shared_folder = process.cwd()
 
 # Enable exports
 root = exports ? this  # http://stackoverflow.com/questions/4214731/coffeescript-global-variables
 
 
+################################################################################
+# Internal data structures and related methods
+################################################################################
+
 # Internal tables used for routing
 origin = {} # Stores {packet.id -> packet} mappings
 mitm = {} # Stores {packet.id -> socket} mappings
+query_hit = {} #Stores {packet.id -> callback} mappings
 
+results = [] # An array of download objects
+
+class DownloadObject
+  constructor : (address, port, fileName) ->
+    @address ?= address
+    @port ?= port
+    @fileName ?= fileName
 
 # Address and port the server is listening on
 serverAddress =
   address : '0.0.0.0'
   port : '0'
 
+# Address and port the file server is listening on
+fileServer =
+  address : '0.0.0.0'
+  port : '0'
+
+root.setFSAddress = (address, port) ->
+  fileServer.address = address
+  fileServer.port = port
 
 ################################################################################
 # REPL API Methods
@@ -117,14 +139,15 @@ root.connect = (address, port) ->
       # handle query hit
       when gp.PacketType.QUERYHIT
         console.log "received QUERYHIT:#{packet.id}"
-        if origin[packet.id]
-          console.log "HITS: #{packet.address}:#{packet.port}"
-          for result in packet.resultSet
-            result_string = "filename:#{result.fileName}, "
-            result_string += "size:#{result.fileSize}, "
-            result_string += "index:#{result.fileIndex}, "
-            result_string += "serventID:#{packet.serventIdentifier}"
-            console.log result_string
+        if origin[packet.id]? && query_hit[packet.id]?
+          query_hit[packet.id] packet
+          #console.log "HITS: #{packet.address}:#{packet.port}"
+          #for result in packet.resultSet
+          #  result_string = "filename:#{result.fileName}, "
+          #  result_string += "size:#{result.fileSize}, "
+          #  result_string += "index:#{result.fileIndex}, "
+          #  result_string += "serventID:#{packet.serventIdentifier}"
+          #  console.log result_string
 
         else if mitm[packet.id]?
           console.log "forwarding QUERYHIT:#{packet.id}"
@@ -152,7 +175,26 @@ root.search = (query, resultCallback) ->
   q = new gp.QueryPacket()
   q.searchCriteria = query
   origin[q.id] = q
+  query_hit[q.id] = (packet) ->
+    console.log "HITS: #{packet.address}:#{packet.port}"
+    for result in packet.resultSet
+      result_string = "##{results.length} filename:#{result.fileName}, "
+      result_string += "size:#{result.fileSize}, "
+      result_string += "index:#{result.fileIndex}, "
+      result_string += "serventID:#{packet.serventIdentifier}"
+      results[results.length] = new DownloadObject(packet.address, packet.port, result.fileName)
+      console.info result_string
   nh.sendToAll(q.serialize())
+
+root.list = ->
+  j = 0
+  while j < results.length
+    result = results[j]
+    result_string = "##{j} filename:#{result.fileName}, "
+    result_string += "address:#{result.address}, "
+    result_string += "port:#{result.port}, "
+    console.info result_string
+    j++
 
 # This method attempts to download the file identified by fileIdentifier
 # Args:
@@ -161,6 +203,17 @@ root.search = (query, resultCallback) ->
 #   downloadStatusCallback: function - called periodically during the 
 #       download process. (TODO: args)
 root.download = (fileIdentifier, downloadStatusCallback) ->
+  downItem = results[fileIdentifier]
+  socket = new net.Socket()
+  socket.on 'connect', ->
+    console.info "Downloading: ##{fileIdentifier}:#{downItem.fileName}"
+    try
+      socket.write "GET /#{downItem.fileName}\n\n"
+    catch error
+      console.info "Failed to download file!"
+  socket.on 'data', (data) ->
+    console.info "#{data.toString()}"
+  socket.connect(downItem.port, downItem.address)
   assert.ok 1
 
 
@@ -283,8 +336,8 @@ root.connectionHandler = (socket) ->
           break
         if stats.isFile()
           queryHit = new gp.QueryHitPacket()
-          queryHit.address = serverAddress.address
-          queryHit.port = serverAddress.port
+          queryHit.address = fileServer.address
+          queryHit.port = fileServer.port
           queryHit.id = packet.id
           queryHit.numHits = 2
           result = new Object()
@@ -318,8 +371,8 @@ root.connectionHandler = (socket) ->
 # address and port on which the server is listening.
 root.listeningHandler = ->
   serverAddress = this.address()
-  console.log "server is now listening on #{serverAddress.address}:#{serverAddress.port}"
-  console.log "CTRL+C to exit"
+  console.info "server is now listening on #{serverAddress.address}:#{serverAddress.port}"
+  console.info "CTRL+C to exit"
   setInterval(updateNeighborhood, 10000)
 
 

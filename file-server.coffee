@@ -74,5 +74,10 @@ class exports.FileServer
 
   listen: (port) ->
     @server.listen port
-    console.log "Static Files hosting on localhost:#{@server.address().port}"
+    console.info "Static Files hosting on localhost:#{@server.address().port}"
 
+  address: ->
+    return @server.address().address
+
+  port: ->
+    return @server.address().port

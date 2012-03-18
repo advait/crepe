@@ -24,6 +24,8 @@ fileServer = new FileServer(shared_folder)
 # Run file server
 fileServer.listen 0
 
+ci.setFSAddress(fileServer.address(), fileServer.port())
+
 # Bind a handler to initialize the listening server
 crepeServer.on 'listening', ci.listeningHandler
 
