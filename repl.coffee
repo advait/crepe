@@ -49,6 +49,15 @@ eval = (cmd) ->
     when "list"
       # Call list in crepe-internal
       ci.list()
+
+    when "help"
+      console.log "\n
+        List of commands:\n
+        connect <ip_address> <port>\n
+        search <search_term>\n
+        list\n
+        download <file_id>\n
+      "
     else
       console.log "Error! no command \"#{tokens[0]}\""
   
