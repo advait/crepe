@@ -11,6 +11,7 @@
 net = require('net')
 fs = require('fs')
 gp = require('./gnutella-packet.js')
+http = require('http')
 assert = require('assert')
 path = require('path')
 shared_folder = process.cwd()
@@ -110,6 +111,8 @@ root.connect = (address, port) ->
         pong.id = packet.id
         pong.address = serverAddress.address
         pong.port = serverAddress.port
+        pong.address = socket.address().address
+        pong.port = socket.address().port
         pong.ttl = 1
         try
           socket.write(pong.serialize())
@@ -204,16 +207,26 @@ root.list = ->
 #       download process. (TODO: args)
 root.download = (fileIdentifier, downloadStatusCallback) ->
   downItem = results[fileIdentifier]
-  socket = new net.Socket()
-  socket.on 'connect', ->
-    console.info "Downloading: ##{fileIdentifier}:#{downItem.fileName}"
-    try
-      socket.write "GET /#{downItem.fileName}\n\n"
-    catch error
-      console.info "Failed to download file!"
-  socket.on 'data', (data) ->
-    console.info "#{data.toString()}"
-  socket.connect(downItem.port, downItem.address)
+  options =
+    host: downItem.address
+    port: downItem.port
+    path: "/#{downItem.fileName}"
+
+
+  console.log "Downloading: #{fileIdentifier}:#{downItem.fileName}"
+  console.log options
+  http.get options, (res) ->
+    console.log "Get File response: #{res.statusCode}"
+
+    if (res.statusCode != 200)
+      console.log "Bad File Response!!"
+      return
+
+    res.on 'data', (data) ->
+      console.log "+++Data Start+++"
+      console.log data.toString()
+      console.log "+++Data End+++"
+
   assert.ok 1
 
 
