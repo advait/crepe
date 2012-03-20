@@ -29,7 +29,7 @@ origin = {} # Stores {packet.id -> packet} mappings
 mitm = {} # Stores {packet.id -> socket} mappings
 query_hit = {} #Stores {packet.id -> callback} mappings
 
-results = [] # An array of download objects
+downloadables = [] # An array of download objects
 
 class DownloadObject
   constructor : (address, port, fileName) ->
@@ -179,23 +179,20 @@ root.search = (query, resultCallback) ->
   query_hit[q.id] = (packet) ->
     console.log "HITS: #{packet.address}:#{packet.port}"
     for result in packet.resultSet
-      result_string = "##{results.length} filename:#{result.fileName}, "
+      result_string = "##{downloadables.length} filename:#{result.fileName}, "
       result_string += "size:#{result.fileSize}, "
       result_string += "index:#{result.fileIndex}, "
       result_string += "serventID:#{packet.serventIdentifier}"
-      results[results.length] = new DownloadObject(packet.address, packet.port, result.fileName)
+      downloadables[downloadables.length] = new DownloadObject(packet.address, packet.port, result.fileName)
       console.info result_string
   nh.sendToAll(q.serialize())
 
 root.list = ->
-  j = 0
-  while j < results.length
-    result = results[j]
+  for result, j in downloadables
     result_string = "##{j} filename:#{result.fileName}, "
     result_string += "address:#{result.address}, "
     result_string += "port:#{result.port}, "
     console.info result_string
-    j++
 
 # This method attempts to download the file identified by fileIdentifier
 # Args:
@@ -204,12 +201,11 @@ root.list = ->
 #   downloadStatusCallback: function - called periodically during the 
 #       download process. (TODO: args)
 root.download = (fileIdentifier, downloadStatusCallback) ->
-  downItem = results[fileIdentifier]
+  downItem = downloadables[fileIdentifier]
   options =
     host: downItem.address
     port: downItem.port
     path: "/#{downItem.fileName}"
-
 
   console.log "Downloading: #{fileIdentifier}:#{downItem.fileName}"
   console.log options
@@ -339,13 +335,13 @@ root.connectionHandler = (socket) ->
         nh.sendToAll(data)
 
         # Send a Query Hit if we find a match
-        results = fileServer.search(packet.searchCriteria)
-        if results.length > 0
+        searchResults = fileServer.search(packet.searchCriteria)
+        if searchResults.length > 0
           queryHit = new gp.QueryHitPacket()
           queryHit.address = socket.address().address
           queryHit.port = fileServerPort
           queryHit.id = packet.id
-          for result in results
+          for result in searchResults
             queryHit.addResult(result)
 
           console.log "sending QUERYHIT:#{queryHit.id}"
