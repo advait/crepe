@@ -374,10 +374,10 @@ root.connectionHandler = (socket) ->
 # This method sets up a listening port for the server as well as saving the
 # address and port on which the server is listening.
 root.listeningHandler = ->
-  crepePort = this.address().port
+  crepePort = @address().port
   console.info "server is now listening port #{crepePort}"
   console.info "CTRL+C to exit"
-  setInterval(updateNeighborhood, 10000)
+  setInterval(updateNeighborhood, 45000)
 
 
 ################################################################################
