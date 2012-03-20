@@ -90,6 +90,7 @@ root.connect = (address, port) ->
     console.log "Received Buffer:"
     console.log data
     packet = gp.deserialize(data)
+    console.log "Deserialized packet: ", packet
     switch packet.type
 
       # handle connect ok
