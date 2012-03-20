@@ -50,12 +50,17 @@ eval = (cmd) ->
       # Call list in crepe-internal
       ci.list()
 
+    when "neighbors"
+      # Print for neighbors.
+      ci.printNeighbors()
+
     when "help"
       console.log "\n
         List of commands:\n
         connect <ip_address> <port>\n
         search <search_term>\n
         list\n
+        neighbors\n
         download <file_id>\n
       "
     else

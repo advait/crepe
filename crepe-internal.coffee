@@ -424,6 +424,8 @@ nh =
       if socket?
         console.log "#{node}"
 
+root.printNeighbors = nh.printAll
+
 updateNeighborhood = ->
   # Indicate that this node sent the original ping
   ping = new gp.PingPacket()
