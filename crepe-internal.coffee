@@ -348,7 +348,6 @@ root.connectionHandler = (socket) ->
             queryHit.addResult(result)
 
           console.log "sending QUERYHIT:#{queryHit.id}"
-          console.log "actual queryhit packet: ", queryHit
           try
             socket.write(queryHit.serialize())
           catch error

@@ -258,15 +258,11 @@ class root.QueryHitPacket extends root.GnutellaPacket
       @address = bigEndianToIp(data.slice(3, 7))
       @speed = data.readUInt32BE(7)
 
-      console.log "Deserializing QH Step 1: ", this
-
       # Parse each result
       @resultSet = []
       data = data.slice(@MIN_PAYLOAD_SIZE)
-      console.log "numHits: ", @numHits
       iterator = if @numHits > 0 then [1..@numHits] else []
       for i in iterator
-        console.log data
         assert.ok data.length >= @MIN_RESULT_SIZE
         result = new Object()
         result.fileIndex = data.readUInt32BE(0)
