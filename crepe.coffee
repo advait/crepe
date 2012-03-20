@@ -24,8 +24,6 @@ fileServer = new FileServer(shared_folder)
 # Run file server
 fileServer.listen 0
 
-ci.setFSAddress(fileServer.address(), fileServer.port())
-
 # Bind a handler to initialize the listening server
 crepeServer.on 'listening', ci.listeningHandler
 
@@ -34,6 +32,9 @@ crepeServer.on 'connection', ci.connectionHandler
 
 # Bind and run!
 crepeServer.listen 0, '0.0.0.0'
+
+# Set fileServer port
+ci.setFileServerPort(fileServer.port())
 
 repl.start('command>').context.ci = ci
 

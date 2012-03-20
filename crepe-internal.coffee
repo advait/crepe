@@ -37,19 +37,12 @@ class DownloadObject
     @port ?= port
     @fileName ?= fileName
 
-# Address and port the server is listening on
-serverAddress =
-  address : '0.0.0.0'
-  port : '0'
+crepePort = 0
+fileServerPort = 0
 
-# Address and port the file server is listening on
-fileServer =
-  address : '0.0.0.0'
-  port : '0'
+root.setFileServerPort = (port) ->
+  fileServerPort = port
 
-root.setFSAddress = (address, port) ->
-  fileServer.address = address
-  fileServer.port = port
 
 ################################################################################
 # REPL API Methods
@@ -109,10 +102,8 @@ root.connect = (address, port) ->
         console.log "replying direct PONG:#{packet.id} to #{@remoteAddress}:#{@remotePort}"
         pong = new gp.PongPacket()
         pong.id = packet.id
-        pong.address = serverAddress.address
-        pong.port = serverAddress.port
         pong.address = socket.address().address
-        pong.port = socket.address().port
+        pong.port = crepePort
         pong.ttl = 1
         try
           socket.write(pong.serialize())
@@ -297,7 +288,7 @@ root.connectionHandler = (socket) ->
         pong = new gp.PongPacket()
         pong.id = packet.id
         pong.address = socket.address().address
-        pong.port = socket.address().port
+        pong.port = crepePort
         pong.numFiles = 1337  # TODO(advait): Fix this
         pong.numKbShared = 1337  # TODO(advait): Fix
         try
@@ -349,8 +340,8 @@ root.connectionHandler = (socket) ->
           break
         if stats.isFile()
           queryHit = new gp.QueryHitPacket()
-          queryHit.address = fileServer.address
-          queryHit.port = fileServer.port
+          queryHit.address = socket.address().address
+          queryHit.port = fileServerPort
           queryHit.id = packet.id
           queryHit.numHits = 2
           result = new Object()
@@ -383,8 +374,8 @@ root.connectionHandler = (socket) ->
 # This method sets up a listening port for the server as well as saving the
 # address and port on which the server is listening.
 root.listeningHandler = ->
-  serverAddress = this.address()
-  console.info "server is now listening on #{serverAddress.address}:#{serverAddress.port}"
+  crepePort = this.address().port
+  console.info "server is now listening port #{crepePort}"
   console.info "CTRL+C to exit"
   setInterval(updateNeighborhood, 10000)
 
