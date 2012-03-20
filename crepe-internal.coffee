@@ -368,7 +368,7 @@ root.listeningHandler = ->
   crepeServerPort = this.address().port
   console.info "server is now listening port #{crepeServerPort}"
   console.info "CTRL+C to exit"
-  setInterval(updateNeighborhood, 10000)
+  setInterval(updateNeighborhood, 45000)
 
 
 ################################################################################

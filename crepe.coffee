@@ -12,8 +12,8 @@
 net = require('net')
 fs = require('fs')
 ci = require('./crepe-internal.js')
+repl = require('./repl')
 FileServer = require('./file-server').FileServer
-repl = require('repl')
 
 shared_folder = process.cwd()
 
@@ -36,7 +36,9 @@ crepeServer.listen 0, '0.0.0.0'
 # Set fileServer port
 ci.setFileServer(fileServer)
 
-repl.start('command>').context.ci = ci
+# Set ci for REPL and start repl!
+repl.setCrepeInternal ci
+repl.start()
 
 ## Timer to keep probing network
 #updateNeighborhood = ->
