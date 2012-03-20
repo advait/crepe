@@ -33,7 +33,7 @@ crepeServer.on 'listening', ci.listeningHandler
 crepeServer.on 'connection', ci.connectionHandler
 
 # Bind and run!
-crepeServer.listen 0, '127.0.0.1'
+crepeServer.listen 0, '0.0.0.0'
 
 repl.start('command>').context.ci = ci
 

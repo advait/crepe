@@ -4,8 +4,8 @@
 ###
 
 # Comment out this method to enable debug messages
-console.log = ->
-  return
+#console.log = ->
+#  return
 
 # Imports
 net = require('net')
@@ -283,8 +283,8 @@ root.connectionHandler = (socket) ->
         console.log "replying PONG:#{packet.id} to #{@remoteAddress}:#{@remotePort}"
         pong = new gp.PongPacket()
         pong.id = packet.id
-        pong.address = serverAddress.address
-        pong.port = serverAddress.port
+        pong.address = socket.address().address
+        pong.port = socket.address().port
         pong.numFiles = 1337  # TODO(advait): Fix this
         pong.numKbShared = 1337  # TODO(advait): Fix
         try
