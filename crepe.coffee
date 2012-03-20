@@ -34,7 +34,7 @@ crepeServer.on 'connection', ci.connectionHandler
 crepeServer.listen 0, '0.0.0.0'
 
 # Set fileServer port
-ci.setFileServerPort(fileServer.port())
+ci.setFileServer(fileServer)
 
 repl.start('command>').context.ci = ci
 

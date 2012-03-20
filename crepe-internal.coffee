@@ -37,11 +37,16 @@ class DownloadObject
     @port ?= port
     @fileName ?= fileName
 
-crepePort = 0
+crepeServer = null  # The actual crepeServer instance
+fileServer = null  # The actual fileServer instance
+crepeServerPort = 0
 fileServerPort = 0
 
-root.setFileServerPort = (port) ->
-  fileServerPort = port
+# Methods to make the crepeServer and fileServer accessible in this file
+root.setCrepeServer = (s) ->
+  crepeServer = s
+root.setFileServer = (s) ->
+  fileServer = s
 
 
 ################################################################################
@@ -103,7 +108,7 @@ root.connect = (address, port) ->
         pong = new gp.PongPacket()
         pong.id = packet.id
         pong.address = socket.address().address
-        pong.port = crepePort
+        pong.port = crepeServerPort
         pong.ttl = 1
         try
           socket.write(pong.serialize())
@@ -288,7 +293,7 @@ root.connectionHandler = (socket) ->
         pong = new gp.PongPacket()
         pong.id = packet.id
         pong.address = socket.address().address
-        pong.port = crepePort
+        pong.port = crepeServerPort
         pong.numFiles = 1337  # TODO(advait): Fix this
         pong.numKbShared = 1337  # TODO(advait): Fix
         try
@@ -332,32 +337,17 @@ root.connectionHandler = (socket) ->
         nh.sendToAll(data)
 
         # Send a Query Hit if we find a match
-        # TODO: use some globbing to find partial match instead of exact
-        try
-          stats = fs.statSync(path.join(shared_folder, packet.searchCriteria))
-        catch error
-          console.log "No Files matched:#{packet.searchCriteria}"
-          break
-        if stats.isFile()
+        results = fileServer.search(packet.searchCriteria)
+        if results.length > 0
           queryHit = new gp.QueryHitPacket()
           queryHit.address = socket.address().address
           queryHit.port = fileServerPort
           queryHit.id = packet.id
-          queryHit.numHits = 2
-          result = new Object()
-          result.fileIndex = 1
-          result.fileSize = stats.size
-          result.fileName = packet.searchCriteria
-          queryHit.addResult(result)
+          for result in results
+            queryHit.addResult(result)
 
-          # Test adding more than one result
-          result = new Object()
-          result.fileIndex = 1337
-          result.fileSize = 13371337
-          result.fileName = "FAKE DATA!"
-          queryHit.addResult(result)
-
-          console.log "sending QUERYHIT:#{packet.id}"
+          console.log "sending QUERYHIT:#{queryHit.id}"
+          console.log "actual queryhit packet: ", queryHit
           try
             socket.write(queryHit.serialize())
           catch error
@@ -374,8 +364,9 @@ root.connectionHandler = (socket) ->
 # This method sets up a listening port for the server as well as saving the
 # address and port on which the server is listening.
 root.listeningHandler = ->
-  crepePort = this.address().port
-  console.info "server is now listening port #{crepePort}"
+  crepeServer = this
+  crepeServerPort = this.address().port
+  console.info "server is now listening port #{crepeServerPort}"
   console.info "CTRL+C to exit"
   setInterval(updateNeighborhood, 10000)
 
