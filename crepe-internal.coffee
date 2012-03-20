@@ -47,6 +47,7 @@ root.setCrepeServer = (s) ->
   crepeServer = s
 root.setFileServer = (s) ->
   fileServer = s
+  fileServerPort = fileServer.port()
 
 
 ################################################################################
