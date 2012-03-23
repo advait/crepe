@@ -38,10 +38,10 @@ root.deserialize = (buffer) ->
   assert.ok Buffer.isBuffer buffer
   s = buffer.toString()
 
-  if s == 'GNUTELLA CONNECT/0.4\n\n'
+  if s.indexOf('GNUTELLA CONNECT/0.4\n\n') != -1
     return new root.ConnectPacket(buffer)
 
-  if s == 'GNUTELLA OK\n\n'
+  if s.indexOf('GNUTELLA OK\n\n') != -1
     return new root.ConnectOKPacket()
 
   assert.ok buffer.length >= root.GnutellaPacket::HEADER_SIZE
@@ -55,7 +55,9 @@ root.deserialize = (buffer) ->
     when 0x40 then output = new root.PushPacket(payloadBuffer)
     when 0x80 then output = new root.QueryPacket(payloadBuffer)
     when 0x81 then output = new root.QueryHitPacket(payloadBuffer)
-    else throw 'Invalid/corrupt packet'
+    else
+      console.log 'Invalid/corrupt packet'
+      return null
 
   # Parse packet header
   output.id = buffer.toString('utf8', 0, 16)
