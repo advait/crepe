@@ -3,10 +3,6 @@
 # and exposes a few useful methods as UI hooks
 ###
 
-# Comment out this method to enable debug messages
-#console.log = ->
-#  return
-
 # Imports
 net = require('net')
 fs = require('fs')
@@ -15,6 +11,12 @@ http = require('http')
 assert = require('assert')
 path = require('path')
 shared_folder = process.cwd()
+debugging = console.log
+
+# Debugging output is off by default. To enable debugging, type 'debug'
+# into the REPL. To turn it off, type 'nodebug'
+console.log = ->
+  return
 
 # Enable exports
 root = exports ? this  # http://stackoverflow.com/questions/4214731/coffeescript-global-variables
@@ -223,6 +225,13 @@ root.download = (fileIdentifier, downloadStatusCallback) ->
 
   assert.ok 1
 
+root.setDebug = (debug) ->
+  if debug
+    console.log = debugging
+  else
+    console.log = ->
+      return
+
 
 ################################################################################
 # Socket Handler Methods
@@ -419,12 +428,13 @@ nh =
 
   # Print the list of neighbors
   printAll: ->
-    console.log "List of neighbors:"
+    console.info "List of neighbors:"
     for node, socket of @neighbors
       if socket?
-        console.log "#{node}"
+        console.info "#{node}"
 
-root.printNeighbors = nh.printAll
+root.printNeighbors = ->
+  nh.printAll()
 
 updateNeighborhood = ->
   # Indicate that this node sent the original ping
@@ -433,5 +443,4 @@ updateNeighborhood = ->
 
   # Flood neighbors with pings
   console.log "Flood neighbors with ping:#{ping.id}"
-  nh.printAll()
   nh.sendToAll(ping.serialize())

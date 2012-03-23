@@ -24,7 +24,7 @@ eval = (cmd) ->
   switch (tokens[0])
     when "connect"
       if (not tokens[1])
-        console.log "Error: IP Address or port must be defined"
+        console.info "Error: IP Address or port must be defined"
         return
 
       # Call connect in crepe-internal
@@ -32,7 +32,7 @@ eval = (cmd) ->
 
     when "download"
       if (not tokens[1])
-        console.log "Error: File ID must be entered"
+        console.info "Error: File ID must be entered"
         return
 
       # Call download in crepe-internal
@@ -40,7 +40,7 @@ eval = (cmd) ->
 
     when "search"
       if (not tokens[1])
-        console.log "Error: Search term must be defined"
+        console.info "Error: Search term must be defined"
         return
 
       # Call search in crepe-internal
@@ -54,17 +54,27 @@ eval = (cmd) ->
       # Print for neighbors.
       ci.printNeighbors()
 
+    when "debug"
+      # Turn debugging on
+      ci.setDebug(true)
+
+    when "nodebug"
+      # Turn debugging off
+      ci.setDebug(false)
+
     when "help"
-      console.log "\n
+      console.info "\n
         List of commands:\n
         connect <ip_address> <port>\n
         search <search_term>\n
         list\n
         neighbors\n
         download <file_id>\n
+        debug\n
+        nodebug\n
       "
     else
-      console.log "Error! no command \"#{tokens[0]}\""
+      console.info "Error! no command \"#{tokens[0]}\""
   
 
 # Global methods.

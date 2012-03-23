@@ -39,19 +39,3 @@ ci.setFileServer(fileServer)
 # Set ci for REPL and start repl!
 repl.setCrepeInternal ci
 repl.start()
-
-## Timer to keep probing network
-#updateNeighborhood = ->
-#  # Indicate that this node sent the original ping
-#  ping = new gp.PingPacket()
-#  context.origin[ping.id] = ping
-#
-#  # Flood neighbors with pings
-#  console.log "periodic flood with ping:#{ping.id}"
-#  context.neighbors.sendToAll(ping.serialize())
-#setInterval(updateNeighborhood, 10000)
-#
-## Timer to keep printing list of neighbors
-#printCurrentNeighborhood = ->
-#  context.neighbors.printAll()
-#setInterval(printCurrentNeighborhood, 10000)
