@@ -41,6 +41,7 @@ class DownloadObject
 
 crepeServer = null  # The actual crepeServer instance
 fileServer = null  # The actual fileServer instance
+shareFolder = null  # The share folder.
 crepeServerPort = 0
 fileServerPort = 0
 
@@ -50,6 +51,9 @@ root.setCrepeServer = (s) ->
 root.setFileServer = (s) ->
   fileServer = s
   fileServerPort = fileServer.port()
+root.setShareFolder = (s) ->
+  shareFolder = s
+
 
 
 ################################################################################
@@ -196,6 +200,15 @@ root.list = ->
     result_string += "port:#{result.port}, "
     console.info result_string
 
+# Create utility function for saving files.  This function is used in
+# root.download
+saveFile = (filePath, data) ->
+  fs.writeFile filePath, data, 'binary', (err) ->
+    if (err)
+      console.log "Error saving the #{filePath}: #{err}"
+    else
+      console.log "#{filePath} save success!"
+
 # This method attempts to download the file identified by fileIdentifier
 # Args:
 #   fileIdentifier: a locally-unique identifier that uniquely identifies
@@ -204,6 +217,12 @@ root.list = ->
 #       download process. (TODO: args)
 root.download = (fileIdentifier, downloadStatusCallback) ->
   downItem = downloadables[fileIdentifier]
+
+  # Make sure that downItem is defined.
+  if (not downItem?)
+    console.log "This index is invalid: #{fileIdentifier}"
+    return
+
   options =
     host: downItem.address
     port: downItem.port
@@ -219,9 +238,48 @@ root.download = (fileIdentifier, downloadStatusCallback) ->
       return
 
     res.on 'data', (data) ->
-      console.log "+++Data Start+++"
-      console.log data.toString()
-      console.log "+++Data End+++"
+      # Takea  look at the current items in teh folder
+      fs.readdir shareFolder, (err, files) ->
+        fileName = downItem.fileName
+        console.log 'Files!'
+
+        # Populate object for instant lookup.
+        temp = {}
+        for file in files
+          temp[file] = true
+        console.log temp
+        filePath = "#{shareFolder}/#{fileName}"
+
+        # Check to see if the file already exists
+        if (not temp[fileName])
+          # Save to the filename if the file doesn't already exist.
+          saveFile filePath, data
+        else
+          # Save the file and append a number to indicate
+          groups = fileName.match /(.*)\.(.*)/
+          fileMain = ''
+          fileExtension = null
+          if (groups)
+            fileMain = groups[1]
+            fileExtension = groups[2]
+          else
+            fileMain = fileName
+
+          i = 0
+          while true
+            if (fileExtension)
+              fileName = "#{fileMain}_(#{i}).#{fileExtension}"
+            else
+              fileName = "#{fileMain}_(#{i})"
+            
+            if (not temp[fileName])
+              saveFile "#{shareFolder}/#{fileName}", data
+              break
+            else
+              i = i + 1
+
+
+
 
   assert.ok 1
 

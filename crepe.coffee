@@ -15,11 +15,11 @@ ci = require('./crepe-internal.js')
 repl = require('./repl')
 FileServer = require('./file-server').FileServer
 
-shared_folder = process.cwd()
+shareFolder = process.cwd()
 
 # Crepe Gnutella server. Handles all incoming requests
 crepeServer = new net.Server()
-fileServer = new FileServer(shared_folder)
+fileServer = new FileServer(shareFolder)
 
 # Run file server
 fileServer.listen 0
@@ -33,8 +33,9 @@ crepeServer.on 'connection', ci.connectionHandler
 # Bind and run!
 crepeServer.listen 0, '0.0.0.0'
 
-# Set fileServer port
-ci.setFileServer(fileServer)
+# Set fileServer port and share folder
+ci.setFileServer fileServer
+ci.setShareFolder shareFolder
 
 # Set ci for REPL and start repl!
 repl.setCrepeInternal ci
