@@ -255,7 +255,7 @@ root.download = (fileIdentifier, downloadStatusCallback) ->
           # Save to the filename if the file doesn't already exist.
           saveFile filePath, data
         else
-          # Save the file and append a number to indicate
+          # Save the file and append a number to indicate it is a copy
           groups = fileName.match /(.*)\.(.*)/
           fileMain = ''
           fileExtension = null
