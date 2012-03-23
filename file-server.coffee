@@ -120,8 +120,4 @@ class exports.FileServer
       return output
     catch error
       console.log error
-      return [{
-        fileIndex: 1337
-        fileSize: 13371337
-        fileName: "FAKE_DATA!"
-      }]
+      return []

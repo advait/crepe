@@ -441,7 +441,7 @@ root.listeningHandler = ->
 
 # Neighborhood object to handle peers in the neighborhood set
 nh =
-  MAX_PEERS : 5
+  MAX_PEERS : 10
   neighbors : {}
   count : 0
 
